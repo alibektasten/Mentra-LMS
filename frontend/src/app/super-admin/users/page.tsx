@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { UserRound } from 'lucide-react'
 import { useAllUsers } from '@/lib/queries/super-admin.queries'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -17,9 +18,9 @@ export default function SuperAdminUsersPage() {
   const totalPages = Math.ceil(total / pageSize)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <PageHeader title="All Users" description={`${total} total`} />
-      <Card>
+      <Card className="sa-card overflow-hidden rounded-2xl border-0">
         <CardContent className="p-0">
           {isLoading ? (
             <div className="space-y-2 p-4">
@@ -28,10 +29,10 @@ export default function SuperAdminUsersPage() {
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-ink-muted">
-                  <th className="px-4 py-3 font-medium">Name</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium">Created</th>
+                <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400 dark:border-slate-700 dark:bg-slate-800/60">
+                  <th className="px-5 py-4">Account</th>
+                  <th className="px-5 py-4">Email</th>
+                  <th className="px-5 py-4">Created</th>
                 </tr>
               </thead>
               <tbody>
@@ -41,10 +42,10 @@ export default function SuperAdminUsersPage() {
                   </tr>
                 ) : (
                   users.map((user) => (
-                    <tr key={user.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3 font-medium text-ink">{user.name}</td>
-                      <td className="px-4 py-3 text-ink-muted">{user.email}</td>
-                      <td className="px-4 py-3 text-ink-muted">{new Date(user.created_at).toLocaleDateString()}</td>
+                    <tr key={user.id} className="border-b border-slate-100 last:border-0 transition hover:bg-violet-50/50 dark:border-slate-700 dark:hover:bg-slate-800/50">
+                      <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-600">{user.name.charAt(0).toUpperCase() || <UserRound className="h-4 w-4" />}</span><span className="font-semibold text-slate-700 dark:text-slate-100">{user.name}</span></div></td>
+                      <td className="px-5 py-4 text-slate-500 dark:text-slate-300">{user.email}</td>
+                      <td className="px-5 py-4 text-slate-400">{new Date(user.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))
                 )}
@@ -55,11 +56,11 @@ export default function SuperAdminUsersPage() {
       </Card>
       {totalPages > 1 && (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          <Button variant="outline" size="sm" className="rounded-lg" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
             Previous
           </Button>
-          <span className="text-sm text-ink-muted">Page {page} of {totalPages}</span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+          <span className="text-sm text-slate-400">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="sm" className="rounded-lg" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
             Next
           </Button>
         </div>

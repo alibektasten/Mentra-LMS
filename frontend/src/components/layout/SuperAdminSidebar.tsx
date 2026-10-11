@@ -32,42 +32,42 @@ export function SuperAdminSidebar({ mobileOpen = false, onClose }: SuperAdminSid
   }
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[264px] shrink-0 flex-col border-r border-[#e7e6e0] bg-[#fbfbf9] shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 lg:shadow-none ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-      <div className="flex h-[72px] items-center gap-3 px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#111110] to-[#3a3a35] text-white text-xs font-bold shadow-[0_5px_12px_rgba(17,17,16,0.16)]">
+    <aside className={`sa-sidebar fixed inset-y-0 left-0 z-50 flex h-screen w-[272px] shrink-0 flex-col shadow-2xl transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 lg:shadow-none ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className="flex h-[84px] items-center gap-3 px-6">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 text-sm font-black text-white shadow-lg shadow-blue-950/30">
           M
         </div>
         <div>
-          <span className="block text-[15px] font-semibold tracking-[-0.025em] text-[#171714]">Mentra</span>
-          <span className="block text-[10px] font-medium uppercase tracking-[0.14em] text-[#a09f99]">Platform control</span>
+          <span className="block text-[17px] font-semibold tracking-[-0.025em] text-white">Mentra</span>
+          <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">System console</span>
         </div>
-        <button aria-label="Close navigation menu" onClick={onClose} className="ml-auto rounded-lg p-2 text-[#77766f] hover:bg-[#f1f0ec] lg:hidden">
+        <button aria-label="Close navigation menu" onClick={onClose} className="ml-auto rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white lg:hidden">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4" onClick={onClose}>
-        <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#aaa9a2]">Administration</p>
+      <nav className="flex-1 overflow-y-auto px-3 py-5" onClick={onClose}>
+        <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Workspace</p>
         {navItems.map((item) => (
           <NavItem key={item.href} {...item} />
         ))}
       </nav>
 
-      <div className="space-y-1 border-t border-[#e7e6e0] p-3">
-        <div className="flex items-center gap-2.5 rounded-xl px-2.5 py-2">
+      <div className="space-y-2 border-t border-white/10 p-4">
+        <div className="flex items-center gap-2.5 rounded-xl bg-white/5 px-2.5 py-2.5">
           <Avatar className="h-8 w-8 shrink-0">
-            <AvatarFallback className="bg-[#dff4e9] text-[#087252] text-[10px] font-bold">
+            <AvatarFallback className="bg-cyan-400 text-slate-950 text-[10px] font-bold">
               {initials}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
-            <span className="block truncate text-xs font-semibold text-[#393934]">{user?.first_name} {user?.last_name}</span>
-            <span className="block truncate text-[10px] text-[#96958e]">Platform administrator</span>
+            <span className="block truncate text-xs font-semibold text-white">{user?.first_name} {user?.last_name}</span>
+            <span className="block truncate text-[10px] text-slate-400">Platform administrator</span>
           </div>
         </div>
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-xs font-medium text-[#77766f] transition-colors hover:bg-[#f1f0ec] hover:text-[#282824]"
+          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-xs font-medium text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           Sign out
