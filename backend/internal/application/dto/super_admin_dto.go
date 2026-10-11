@@ -27,3 +27,8 @@ type InviteOrgAdminRequest struct {
 	Password string `json:"password" binding:"required,min=8"`
 	OrgID    string `json:"org_id"   binding:"required"`
 }
+
+type CreateOrganizationRequest struct {
+	Name string `json:"name" binding:"required,min=2,max=120"`
+	Slug string `json:"slug" binding:"required,min=2,max=63,alphanum"`
+}

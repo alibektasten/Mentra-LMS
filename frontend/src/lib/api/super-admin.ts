@@ -12,6 +12,11 @@ export async function listOrgs(params?: { page?: number; page_size?: number }): 
   return res.data
 }
 
+export async function createOrg(input: { name: string; slug: string }): Promise<OrgDTO> {
+  const res = await apiClient.post<OrgDTO>('/super-admin/orgs', input)
+  return res.data
+}
+
 export async function deleteOrg(id: string): Promise<void> {
   await apiClient.delete(`/super-admin/orgs/${id}`)
 }

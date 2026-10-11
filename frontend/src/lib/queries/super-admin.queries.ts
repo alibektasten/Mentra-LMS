@@ -40,6 +40,17 @@ export function useDeleteOrg() {
   })
 }
 
+export function useCreateOrg() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: superAdminApi.createOrg,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['super-admin', 'orgs'] })
+      qc.invalidateQueries({ queryKey: superAdminKeys.stats })
+    },
+  })
+}
+
 export function useInviteOrgAdmin() {
   const qc = useQueryClient()
   return useMutation({

@@ -1,19 +1,26 @@
 'use client'
 
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Building2, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useAdminOrgs, useDeleteOrg } from '@/lib/queries/super-admin.queries'
+import { useAdminOrgs, useCreateOrg, useDeleteOrg } from '@/lib/queries/super-admin.queries'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent } from '@/components/ui/card'
 
 export default function SuperAdminOrgsPage() {
   const [page, setPage] = useState(1)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
   const pageSize = 20
   const { data, isLoading } = useAdminOrgs({ page, page_size: pageSize })
   const deleteOrg = useDeleteOrg()
+  const createOrg = useCreateOrg()
 
   const orgs = data?.data ?? []
   const total = data?.meta?.total ?? 0
@@ -30,9 +37,27 @@ export default function SuperAdminOrgsPage() {
     })
   }
 
+  const handleCreate = async () => {
+    try {
+      const org = await createOrg.mutateAsync({ name: name.trim(), slug: slug.trim().toLowerCase() })
+      toast.success(`Organization “${org.name}” created`)
+      setCreateOpen(false)
+      setName('')
+      setSlug('')
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: { message?: string } } } }
+      toast.error(e?.response?.data?.error?.message ?? 'Failed to create organization')
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Organizations" description={`${total} total`} />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <PageHeader title="Organizations" description={`${total} total`} />
+        <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" /> Create organization
+        </Button>
+      </div>
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
@@ -89,6 +114,30 @@ export default function SuperAdminOrgsPage() {
           </Button>
         </div>
       )}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Building2 className="h-5 w-5" /> New organization</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="org-name">Organization name</Label>
+              <Input id="org-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Example University" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="org-slug">Workspace slug</Label>
+              <Input id="org-slug" value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))} placeholder="example" />
+              <p className="text-xs text-ink-muted">Used in the login address: /example/login</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button disabled={createOrg.isPending || name.trim().length < 2 || slug.trim().length < 2} onClick={handleCreate}>
+              {createOrg.isPending ? 'Creating…' : 'Create organization'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

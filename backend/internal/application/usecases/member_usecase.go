@@ -221,6 +221,19 @@ func (uc *MemberUseCase) BulkImportCSV(ctx context.Context, orgID uuid.UUID, r i
 }
 
 func (uc *MemberUseCase) RemoveMember(ctx context.Context, membershipID, orgID uuid.UUID) error {
+	membership, err := uc.memberRepo.FindByID(ctx, membershipID, orgID)
+	if err != nil {
+		return err
+	}
+	if membership.Role == entities.RoleAdmin {
+		_, admins, err := uc.memberRepo.FindByOrgFiltered(ctx, orgID, string(entities.RoleAdmin), 1, 1)
+		if err != nil {
+			return err
+		}
+		if admins <= 1 {
+			return apperrors.ValidationError("an organization must retain at least one administrator")
+		}
+	}
 	return uc.memberRepo.Delete(ctx, membershipID, orgID)
 }
 
@@ -229,7 +242,17 @@ func (uc *MemberUseCase) UpdateRole(ctx context.Context, membershipID, orgID uui
 	if err != nil {
 		return nil, err
 	}
-	m.Role = entities.Role(req.Role)
+	newRole := entities.Role(req.Role)
+	if m.Role == entities.RoleAdmin && newRole != entities.RoleAdmin {
+		_, admins, err := uc.memberRepo.FindByOrgFiltered(ctx, orgID, string(entities.RoleAdmin), 1, 1)
+		if err != nil {
+			return nil, err
+		}
+		if admins <= 1 {
+			return nil, apperrors.ValidationError("an organization must retain at least one administrator")
+		}
+	}
+	m.Role = newRole
 	m.UpdatedAt = time.Now()
 	if err := uc.memberRepo.Update(ctx, m); err != nil {
 		return nil, err

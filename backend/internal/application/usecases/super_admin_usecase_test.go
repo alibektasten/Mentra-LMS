@@ -50,10 +50,28 @@ func TestSuperAdminUseCase_DeleteOrg_Success(t *testing.T) {
 	uc := newSuperAdminUC(userRepo, orgRepo, memberRepo)
 
 	orgID := uuid.New()
+	memberRepo.On("FindByOrg", mock.Anything, orgID, 1, 1).Return([]entities.Membership{}, int64(0), nil)
 	orgRepo.On("Delete", mock.Anything, orgID).Return(nil)
 
 	err := uc.DeleteOrg(context.Background(), orgID)
 	require.NoError(t, err)
+}
+
+func TestSuperAdminUseCase_DeleteOrg_BlocksOrganizationWithMembers(t *testing.T) {
+	userRepo := new(mocks.MockUserRepository)
+	orgRepo := new(mocks.MockOrganizationRepository)
+	memberRepo := new(mocks.MockMembershipRepository)
+	uc := newSuperAdminUC(userRepo, orgRepo, memberRepo)
+
+	orgID := uuid.New()
+	memberRepo.On("FindByOrg", mock.Anything, orgID, 1, 1).Return([]entities.Membership{}, int64(1), nil)
+
+	err := uc.DeleteOrg(context.Background(), orgID)
+	require.Error(t, err)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, http.StatusUnprocessableEntity, appErr.HTTPStatus)
+	orgRepo.AssertNotCalled(t, "Delete", mock.Anything, mock.Anything)
 }
 
 func TestSuperAdminUseCase_ListUsers_Success(t *testing.T) {

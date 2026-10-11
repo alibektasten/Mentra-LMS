@@ -50,7 +50,26 @@ func (uc *SuperAdminUseCase) ListOrgs(ctx context.Context, page, pageSize int) (
 }
 
 func (uc *SuperAdminUseCase) DeleteOrg(ctx context.Context, id uuid.UUID) error {
+	_, members, err := uc.memberRepo.FindByOrg(ctx, id, 1, 1)
+	if err != nil {
+		return err
+	}
+	if members > 0 {
+		return apperrors.ValidationError("remove organization members before deleting an organization")
+	}
 	return uc.orgRepo.Delete(ctx, id)
+}
+
+func (uc *SuperAdminUseCase) CreateOrg(ctx context.Context, req dto.CreateOrganizationRequest) (*dto.OrgDTO, error) {
+	if existing, _ := uc.orgRepo.FindBySlug(ctx, req.Slug); existing != nil {
+		return nil, apperrors.ConflictError("organization slug")
+	}
+	now := time.Now()
+	org := &entities.Organization{ID: uuid.New(), Name: req.Name, Slug: req.Slug, CreatedAt: now, UpdatedAt: now}
+	if err := uc.orgRepo.Create(ctx, org); err != nil {
+		return nil, err
+	}
+	return &dto.OrgDTO{ID: org.ID.String(), Name: org.Name, Slug: org.Slug, CreatedAt: org.CreatedAt}, nil
 }
 
 func (uc *SuperAdminUseCase) ListUsers(ctx context.Context, page, pageSize int) ([]dto.AdminUserDTO, int64, error) {

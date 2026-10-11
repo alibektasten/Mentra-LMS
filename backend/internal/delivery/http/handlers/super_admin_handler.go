@@ -72,6 +72,20 @@ func (h *SuperAdminHandler) ListOrgs(c *gin.Context) {
 	})
 }
 
+func (h *SuperAdminHandler) CreateOrg(c *gin.Context) {
+	var req dto.CreateOrganizationRequest
+	if err := bindJSON(c, &req); err != nil {
+		c.Error(err)
+		return
+	}
+	result, err := h.superAdminUC.CreateOrg(c.Request.Context(), req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": result})
+}
+
 func (h *SuperAdminHandler) DeleteOrg(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {

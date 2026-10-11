@@ -77,6 +77,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	sa.Use(middleware.Auth(deps.JWTSecret), middleware.RequireRole(entities.RoleSuperAdmin))
 	sa.GET("/stats", deps.SuperAdminHandler.GetStats)
 	sa.GET("/orgs", deps.SuperAdminHandler.ListOrgs)
+	sa.POST("/orgs", deps.SuperAdminHandler.CreateOrg)
 	sa.DELETE("/orgs/:id", deps.SuperAdminHandler.DeleteOrg)
 	sa.GET("/users", deps.SuperAdminHandler.ListUsers)
 	sa.POST("/orgs/invite-admin", deps.SuperAdminHandler.InviteOrgAdmin)
