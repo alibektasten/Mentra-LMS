@@ -11,12 +11,14 @@ import { GroupCard } from './GroupCard'
 import { GroupForm } from './GroupForm'
 import { GroupMembers } from './GroupMembers'
 import { GroupScheduleList } from './GroupScheduleList'
+import { useI18n } from '@/lib/i18n'
 
 interface GroupListProps {
   courseId: string
 }
 
 export function GroupList({ courseId }: GroupListProps) {
+  const { t } = useI18n()
   const { data: groupsData, isLoading } = useGroups(courseId)
   const createGroup = useCreateGroup(courseId)
   const updateGroup = useUpdateGroup(courseId)
@@ -33,10 +35,10 @@ export function GroupList({ courseId }: GroupListProps) {
   const handleCreate = async (input: { name: string; teacher_id?: string }) => {
     try {
       await createGroup.mutateAsync(input)
-      toast.success('Group created')
+      toast.success(t('groupCreated'))
       setFormOpen(false)
     } catch {
-      toast.error('Failed to create group')
+      toast.error(t('failedToCreateGroup'))
     }
   }
 
@@ -44,20 +46,20 @@ export function GroupList({ courseId }: GroupListProps) {
     if (!editingGroup) return
     try {
       await updateGroup.mutateAsync({ id: editingGroup.id, input })
-      toast.success('Group updated')
+      toast.success(t('groupUpdated'))
       setEditingGroup(undefined)
     } catch {
-      toast.error('Failed to update group')
+      toast.error(t('failedToUpdateGroup'))
     }
   }
 
   const handleDelete = async (groupId: string) => {
     try {
       await deleteGroup.mutateAsync(groupId)
-      toast.success('Group deleted')
+      toast.success(t('groupDeleted'))
       if (selectedGroupId === groupId) setSelectedGroupId(null)
     } catch {
-      toast.error('Failed to delete group')
+      toast.error(t('failedToDeleteGroup'))
     }
   }
 
@@ -68,17 +70,17 @@ export function GroupList({ courseId }: GroupListProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[#1a1a1a]">Course Groups</h3>
+        <h3 className="text-sm font-semibold text-[#1a1a1a]">{t('courseGroups')}</h3>
         <Button size="sm" variant="outline" onClick={() => setFormOpen(true)}>
           <Plus className="h-4 w-4 mr-1.5" />
-          New Group
+          {t('newGroup')}
         </Button>
       </div>
 
       {groups.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center rounded-xl border border-dashed border-[#e4e2de]">
           <Users className="h-7 w-7 text-[#d4d2ce] mb-2" />
-          <p className="text-sm text-[#9b9b9b]">No groups yet. Create the first one.</p>
+          <p className="text-sm text-[#9b9b9b]">{t('noGroupsToCreate')}</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -106,7 +108,7 @@ export function GroupList({ courseId }: GroupListProps) {
               onClick={() => setSelectedGroupId(null)}
               className="text-xs text-[#9b9b9b] hover:text-[#1a1a1a] transition-colors"
             >
-              Close
+              {t('close')}
             </button>
           </div>
 
@@ -122,7 +124,7 @@ export function GroupList({ courseId }: GroupListProps) {
                 }`}
               >
                 {tab === 'members' ? <Users className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />}
-                {tab === 'members' ? 'Members' : 'Schedule'}
+                {tab === 'members' ? t('members') : t('schedule')}
               </button>
             ))}
           </div>

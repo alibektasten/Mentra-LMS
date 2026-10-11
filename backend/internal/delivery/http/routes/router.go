@@ -10,29 +10,43 @@ import (
 )
 
 type Dependencies struct {
-	AuthHandler              *handlers.AuthHandler
-	CourseHandler            *handlers.CourseHandler
-	CourseTeacherHandler     *handlers.CourseTeacherHandler
-	MemberHandler            *handlers.MemberHandler
-	ModuleHandler            *handlers.ModuleHandler
-	LessonHandler            *handlers.LessonHandler
-	AIHandler                *handlers.AIHandler
-	ProgressHandler          *handlers.ProgressHandler
-	UserHandler              *handlers.UserHandler
-	SuperAdminHandler        *handlers.SuperAdminHandler
-	AssignmentHandler        *handlers.AssignmentHandler
-	QuizAttemptHandler       *handlers.QuizAttemptHandler
-	QuizHandler              *handlers.QuizHandler
-	FileAttachmentHandler    *handlers.FileAttachmentHandler
-	GradeHandler             *handlers.GradeHandler
-	UploadHandler            *handlers.UploadHandler
-	AnnouncementHandler      *handlers.AnnouncementHandler
-	GroupHandler             *handlers.GroupHandler
-	ExamHandler              *handlers.ExamHandler
-	OrgRepo                  repositories.OrganizationRepository
-	JWTSecret                string
-	Logger                   *logger.Logger
-	UploadDir                string
+	AuthHandler           *handlers.AuthHandler
+	CourseHandler         *handlers.CourseHandler
+	CourseTeacherHandler  *handlers.CourseTeacherHandler
+	MemberHandler         *handlers.MemberHandler
+	ModuleHandler         *handlers.ModuleHandler
+	LessonHandler         *handlers.LessonHandler
+	AIHandler             *handlers.AIHandler
+	ProgressHandler       *handlers.ProgressHandler
+	UserHandler           *handlers.UserHandler
+	SuperAdminHandler     *handlers.SuperAdminHandler
+	AssignmentHandler     *handlers.AssignmentHandler
+	QuizAttemptHandler    *handlers.QuizAttemptHandler
+	QuizHandler           *handlers.QuizHandler
+	FileAttachmentHandler *handlers.FileAttachmentHandler
+	GradeHandler          *handlers.GradeHandler
+	UploadHandler         *handlers.UploadHandler
+	AnnouncementHandler   *handlers.AnnouncementHandler
+	GroupHandler          *handlers.GroupHandler
+	ExamHandler           *handlers.ExamHandler
+	TeacherHandler        *handlers.TeacherHandler
+	FlashcardDeckHandler  *handlers.FlashcardDeckHandler
+	CertificateHandler    *handlers.CertificateHandler
+	NotificationHandler   *handlers.NotificationHandler
+	OrgRepo               repositories.OrganizationRepository
+	CourseRepo            repositories.CourseRepository
+	CourseTeacherRepo     repositories.CourseTeacherRepository
+	GroupRepo             repositories.GroupRepository
+	ModuleRepo            repositories.ModuleRepository
+	LessonRepo            repositories.LessonRepository
+	AssignmentRepo        repositories.AssignmentRepository
+	QuizRepo              repositories.QuizRepository
+	ExamRepo              repositories.ExamRepository
+	ExamAttemptRepo       repositories.ExamAttemptRepository
+	JWTSecret             string
+	AIRequestLimit        int
+	Logger                *logger.Logger
+	UploadDir             string
 }
 
 func NewRouter(deps Dependencies) *gin.Engine {
@@ -44,11 +58,19 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		middleware.ErrorHandler(),
 		middleware.RateLimiter(100),
 	)
+	// Lightweight liveness probe for a reverse proxy or container platform.
+	// It intentionally has no auth requirement and does not disclose internals.
+	health := func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	}
+	r.GET("/health", health)
+	r.GET("/healthz", health)
 
 	api := r.Group("/api/v1")
+	api.GET("/certificates/:code", deps.CertificateHandler.Verify)
 
 	// Super admin public login — no tenant middleware
-	api.POST("/super-admin/auth/login", deps.SuperAdminHandler.Login)
+	api.POST("/super-admin/auth/login", middleware.RateLimiter(5), deps.SuperAdminHandler.Login)
 
 	// Super admin protected routes — Auth + RequireRole only, no Tenant middleware
 	sa := api.Group("/super-admin")
@@ -61,8 +83,14 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	// Public routes
 	auth := api.Group("/auth")
+	// Authentication endpoints are intentionally tighter than normal API
+	// traffic to reduce credential stuffing and account enumeration attempts.
+	auth.Use(middleware.RateLimiter(10))
 	auth.POST("/register", deps.AuthHandler.Register)
 	auth.POST("/login", deps.AuthHandler.Login)
+	auth.GET("/google/status", deps.AuthHandler.GoogleStatus)
+	auth.GET("/google/start", deps.AuthHandler.GoogleStart)
+	auth.GET("/google/callback", deps.AuthHandler.GoogleCallback)
 
 	// Protected routes
 	protected := api.Group("/")
@@ -71,8 +99,15 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		middleware.Tenant(deps.OrgRepo),
 	)
 
+	teacher := protected.Group("/teacher")
+	teacher.Use(middleware.RequireRole(entities.RoleTeacher))
+	teacher.GET("/overview", deps.TeacherHandler.Overview)
+	teacher.GET("/students", deps.TeacherHandler.Students)
+	teacher.GET("/review-queue", deps.TeacherHandler.ReviewQueue)
+
 	// Courses
 	courses := protected.Group("/courses")
+	courses.Use(middleware.RequireAssignedCourse(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo))
 	courses.GET("", deps.CourseHandler.List)
 	courses.GET("/:id", deps.CourseHandler.Get)
 	courses.POST("",
@@ -130,6 +165,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	// Lessons (nested under modules — separate tree, no wildcard conflict)
 	lessons := protected.Group("/modules/:moduleID/lessons")
+	lessons.Use(middleware.RequireAssignedModule(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo, deps.ModuleRepo, "moduleID"))
 	lessons.GET("", deps.LessonHandler.List)
 	lessons.POST("",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
@@ -149,24 +185,39 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	progress := protected.Group("/progress")
 	progress.GET("", deps.ProgressHandler.GetProgress)
 	progress.GET("/insights", deps.ProgressHandler.GetInsights)
-	progress.POST("/lessons/:lessonID/complete", deps.ProgressHandler.Complete)
+	progress.POST("/lessons/:lessonID/complete",
+		middleware.RequireAssignedLesson(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo, deps.LessonRepo, deps.ModuleRepo, "lessonID"),
+		deps.ProgressHandler.Complete,
+	)
 
-	// AI — read-only generation open to all roles; no write side effects
+	// AI study tools are available to all tenant roles. Quiz authoring is kept
+	// to teachers and admins because it exposes answer keys.
 	ai := protected.Group("/ai")
+	// Model calls are costly and can be abused even by an authenticated user.
+	ai.Use(middleware.RateLimiter(6), middleware.DailyAIQuota(deps.AIRequestLimit))
 	ai.POST("/summarize", deps.AIHandler.SummarizeLesson)
-	ai.POST("/generate-quiz", deps.AIHandler.GenerateQuiz)
+	ai.POST("/generate-quiz",
+		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
+		deps.AIHandler.GenerateQuiz,
+	)
 	ai.POST("/assignment-feedback", deps.AIHandler.GetAssignmentFeedback)
 	ai.POST("/generate-flashcards", deps.AIHandler.GenerateFlashcards)
+
+	// Flashcard decks are learner-owned and sync across a user's devices.
+	flashcardDecks := protected.Group("/flashcard-decks")
+	flashcardDecks.GET("", deps.FlashcardDeckHandler.List)
+	flashcardDecks.POST("", deps.FlashcardDeckHandler.Create)
+	flashcardDecks.POST("/:id/reviews", deps.FlashcardDeckHandler.Review)
+	flashcardDecks.DELETE("/:id", deps.FlashcardDeckHandler.Delete)
 
 	// User profile
 	protected.GET("/me", deps.UserHandler.GetMe)
 	protected.PUT("/me", deps.UserHandler.UpdateMe)
+	protected.GET("/certificates", deps.CertificateHandler.ListMine)
+	protected.GET("/notifications", deps.NotificationHandler.List)
 
 	// Upload
-	protected.POST("/upload",
-		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
-		deps.UploadHandler.Upload,
-	)
+	protected.POST("/upload", middleware.RateLimiter(2), deps.UploadHandler.Upload)
 
 	// Assignments (inline in courses group — same :id wildcard for course ID)
 	courses.GET("/:id/modules/:moduleID/assignments", deps.AssignmentHandler.ListByModule)
@@ -176,6 +227,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	)
 
 	assignmentsStandalone := protected.Group("/assignments")
+	assignmentsStandalone.Use(middleware.RequireAssignedAssignment(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo, deps.AssignmentRepo, "id"))
 	assignmentsStandalone.GET("/:id", deps.AssignmentHandler.Get)
 	assignmentsStandalone.PUT("/:id",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
@@ -195,6 +247,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	// Submissions grading
 	submissions := protected.Group("/submissions")
+	submissions.Use(middleware.RequireAssignedSubmission(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo, deps.AssignmentRepo, "id"))
 	submissions.PUT("/:id/grade",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
 		deps.AssignmentHandler.GradeSubmission,
@@ -202,6 +255,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	// Quiz attempts + teacher CRUD
 	quizzes := protected.Group("/quizzes")
+	quizzes.Use(middleware.RequireAssignedQuiz(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo, deps.QuizRepo, deps.LessonRepo, deps.ModuleRepo, "id"))
 	quizzes.POST("/:id/attempt", deps.QuizAttemptHandler.SubmitAttempt)
 	quizzes.GET("/:id/my-attempt", deps.QuizAttemptHandler.GetMyAttempt)
 	quizzes.PUT("/:id",
@@ -215,6 +269,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	// Quiz by lesson (standalone lesson routes)
 	lessonRoutes := protected.Group("/lessons")
+	lessonRoutes.Use(middleware.RequireAssignedLesson(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo, deps.LessonRepo, deps.ModuleRepo, "lessonID"))
 	lessonRoutes.POST("/:lessonID/quiz",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
 		deps.QuizHandler.Create,
@@ -270,12 +325,18 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	orgGroups.DELETE("/:groupID/schedules/:schedID", deps.GroupHandler.DeleteSchedule)
 
 	// Groups (course-scoped)
-	courses.GET("/:id/groups", deps.GroupHandler.List)
+	courses.GET("/:id/groups",
+		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
+		deps.GroupHandler.List,
+	)
 	courses.POST("/:id/groups",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
 		deps.GroupHandler.Create,
 	)
-	courses.GET("/:id/groups/:groupID", deps.GroupHandler.Get)
+	courses.GET("/:id/groups/:groupID",
+		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
+		deps.GroupHandler.Get,
+	)
 	courses.PUT("/:id/groups/:groupID",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
 		deps.GroupHandler.Update,
@@ -318,6 +379,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	)
 
 	exams := protected.Group("/exams")
+	exams.Use(middleware.RequireAssignedExam(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo, deps.ExamRepo, "id"))
 	exams.GET("/:id", deps.ExamHandler.Get)
 	exams.PUT("/:id",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
@@ -339,6 +401,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	)
 
 	examAttempts := protected.Group("/exam-attempts")
+	examAttempts.Use(middleware.RequireAssignedExamAttempt(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo, deps.ExamAttemptRepo, deps.ExamRepo, "id"))
+	examAttempts.PUT("/:id/draft", deps.ExamHandler.SaveDraft)
 	examAttempts.POST("/:id/submit", deps.ExamHandler.SubmitAttempt)
 	examAttempts.PUT("/:id/grade",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),

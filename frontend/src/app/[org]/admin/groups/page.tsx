@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { GroupMembers } from '@/components/groups/GroupMembers'
 import { GroupScheduleList } from '@/components/groups/GroupScheduleList'
+import { useI18n } from '@/lib/i18n'
 
 function AssignCourseDialog({
   group,
@@ -31,6 +32,7 @@ function AssignCourseDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const { t } = useI18n()
   const [courseId, setCourseId] = useState(group.course_id ?? '')
   const { data: coursesData } = useCourses({ page: 1, page_size: 100 })
   const assign = useAssignGroupToCourse()
@@ -41,10 +43,10 @@ function AssignCourseDialog({
     if (!courseId) return
     try {
       await assign.mutateAsync({ groupId: group.id, input: { course_id: courseId } })
-      toast.success('Group assigned to course')
+      toast.success(t('groupAssigned'))
       onOpenChange(false)
     } catch {
-      toast.error('Failed to assign group')
+      toast.error(t('failedToAssignGroup'))
     }
   }
 
@@ -57,7 +59,7 @@ function AssignCourseDialog({
         <div className="space-y-4 py-2">
           <Select value={courseId} onValueChange={setCourseId}>
             <SelectTrigger className="border-[#e4e2de]">
-              <SelectValue placeholder="Select a course…" />
+              <SelectValue placeholder={t('selectCourse')} />
             </SelectTrigger>
             <SelectContent>
               {courses.map((c) => (
@@ -69,13 +71,13 @@ function AssignCourseDialog({
           </Select>
         </div>
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('cancel')}</Button>
           <Button
             disabled={!courseId || assign.isPending}
             onClick={handleAssign}
             className="bg-[#059669] hover:bg-[#047857] text-white"
           >
-            {assign.isPending ? 'Assigning…' : 'Assign'}
+            {assign.isPending ? t('assigning') : t('assign')}
           </Button>
         </div>
       </DialogContent>
@@ -84,6 +86,7 @@ function AssignCourseDialog({
 }
 
 export default function AdminGroupsPage() {
+  const { t } = useI18n()
   const { data: groups, isLoading } = useOrgGroups()
   const createGroup = useCreateOrgGroup()
   const updateGroup = useUpdateOrgGroup()
@@ -102,10 +105,10 @@ export default function AdminGroupsPage() {
   const handleCreate = async (input: CreateGroupInput) => {
     try {
       await createGroup.mutateAsync(input)
-      toast.success('Group created')
+      toast.success(t('groupCreated'))
       setCreateOpen(false)
     } catch {
-      toast.error('Failed to create group')
+      toast.error(t('failedToCreateGroup'))
     }
   }
 
@@ -113,28 +116,28 @@ export default function AdminGroupsPage() {
     if (!editingGroup) return
     try {
       await updateGroup.mutateAsync({ id: editingGroup.id, input })
-      toast.success('Group updated')
+      toast.success(t('groupUpdated'))
       setEditingGroup(undefined)
     } catch {
-      toast.error('Failed to update group')
+      toast.error(t('failedToUpdateGroup'))
     }
   }
 
   const handleDelete = async (groupId: string) => {
     try {
       await deleteGroup.mutateAsync(groupId)
-      toast.success('Group deleted')
+      toast.success(t('groupDeleted'))
     } catch {
-      toast.error('Failed to delete group')
+      toast.error(t('failedToDeleteGroup'))
     }
   }
 
   const handleUnassign = async (groupId: string) => {
     try {
       await unassign.mutateAsync(groupId)
-      toast.success('Group unassigned from course')
+      toast.success(t('groupUnassigned'))
     } catch {
-      toast.error('Failed to unassign group')
+      toast.error(t('failedToUnassignGroup'))
     }
   }
 
@@ -144,9 +147,9 @@ export default function AdminGroupsPage() {
         <div>
           <div className="flex items-center gap-2.5 mb-1.5">
             <Users className="h-5 w-5 text-[#6b6b6b]" />
-            <h1 className="text-[1.4rem] font-bold tracking-tight text-[#1a1a1a]">Group Management</h1>
+            <h1 className="text-[1.4rem] font-bold tracking-tight text-[#1a1a1a]">{t('groupManagement')}</h1>
           </div>
-          <p className="text-sm text-[#6b6b6b]">Create groups, then assign them to courses.</p>
+          <p className="text-sm text-[#6b6b6b]">{t('groupManagementDescription')}</p>
         </div>
         <Button
           size="sm"
@@ -154,7 +157,7 @@ export default function AdminGroupsPage() {
           className="bg-[#059669] hover:bg-[#047857] text-white gap-1.5"
         >
           <Plus className="h-3.5 w-3.5" />
-          New Group
+          {t('newGroup')}
         </Button>
       </div>
 
@@ -165,7 +168,7 @@ export default function AdminGroupsPage() {
       ) : !groups || groups.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-dashed border-[#e4e2de]">
           <Users className="h-7 w-7 text-[#d4d2ce] mb-2" />
-          <p className="text-sm text-[#9b9b9b]">No groups yet. Create the first one.</p>
+          <p className="text-sm text-[#9b9b9b]">{t('noGroupsToCreate')}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -187,9 +190,9 @@ export default function AdminGroupsPage() {
                     <p className="text-sm font-semibold text-[#1a1a1a] truncate">{group.name}</p>
                     <p className="text-xs mt-0.5">
                       {course ? (
-                        <span className="text-emerald-600">Course: {course.title}</span>
+                        <span className="text-emerald-600">{t('assignedCourse')}: {course.title}</span>
                       ) : (
-                        <span className="text-amber-600">Not assigned to any course</span>
+                        <span className="text-amber-600">{t('notAssigned')}</span>
                       )}
                     </p>
                   </div>
@@ -198,11 +201,11 @@ export default function AdminGroupsPage() {
                     {group.course_id ? (
                       <ConfirmDialog
                         trigger={
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-[#9b9b9b] hover:text-amber-600" title="Unassign from course">
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-[#9b9b9b] hover:text-amber-600" title={t('unassignFromCourse')}>
                             <Link2Off className="h-3.5 w-3.5" />
                           </Button>
                         }
-                        title="Unassign from course?"
+                        title={t('unassignFromCourse')}
                         description={`"${group.name}" will be removed from its course. Members remain in the group.`}
                         confirmLabel="Unassign"
                         onConfirm={() => handleUnassign(group.id)}
@@ -212,7 +215,7 @@ export default function AdminGroupsPage() {
                         size="sm"
                         variant="ghost"
                         className="h-7 w-7 p-0 text-[#9b9b9b] hover:text-[#059669]"
-                        title="Assign to course"
+                        title={t('assignToCourse')}
                         onClick={() => setAssigningGroup(group)}
                       >
                         <Link2 className="h-3.5 w-3.5" />
@@ -232,7 +235,7 @@ export default function AdminGroupsPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       }
-                      title="Delete group?"
+                      title={t('deleteGroup')}
                       description={`"${group.name}" and all its members and schedules will be deleted.`}
                       confirmLabel="Delete"
                       onConfirm={() => handleDelete(group.id)}
@@ -257,7 +260,7 @@ export default function AdminGroupsPage() {
                           }`}
                         >
                           {tab === 'members' ? <Users className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />}
-                          {tab === 'members' ? 'Members' : 'Schedule'}
+                          {tab === 'members' ? t('members') : t('schedule')}
                         </button>
                       ))}
                     </div>

@@ -1,8 +1,11 @@
+'use client'
+
 import { CourseDTO } from '@/types/course'
 import { CourseCard } from './CourseCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { BookOpen } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 interface CourseGridProps {
   courses: CourseDTO[]
@@ -13,6 +16,7 @@ interface CourseGridProps {
 }
 
 export function CourseGrid({ courses, isLoading, basePath, onDelete, emptyAction }: CourseGridProps) {
+  const { t } = useI18n()
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -27,8 +31,8 @@ export function CourseGrid({ courses, isLoading, basePath, onDelete, emptyAction
     return (
       <EmptyState
         icon={BookOpen}
-        title="No courses yet"
-        description="Create your first course to get started"
+        title={t('noCoursesYet')}
+        description={t('availableCourses')}
         action={emptyAction}
       />
     )

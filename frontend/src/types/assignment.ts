@@ -4,6 +4,7 @@ export interface AssignmentDTO {
   module_id: string;
   title: string;
   description: string;
+  rubric: string;
   max_points: number;
   due_date: string | null;
   allow_late_submission: boolean;
@@ -28,6 +29,7 @@ export interface SubmissionDTO {
 export interface CreateAssignmentInput {
   title: string;
   description?: string;
+  rubric?: string;
   max_points: number;
   due_date?: string;
   allow_late_submission?: boolean;
@@ -36,6 +38,7 @@ export interface CreateAssignmentInput {
 export interface UpdateAssignmentInput {
   title?: string;
   description?: string;
+  rubric?: string;
   max_points?: number;
   due_date?: string;
   allow_late_submission?: boolean;

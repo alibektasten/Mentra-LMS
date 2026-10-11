@@ -18,7 +18,7 @@ export async function createCourse(input: CreateCourseInput): Promise<CourseDTO>
 }
 
 export async function updateCourse(id: string, input: UpdateCourseInput): Promise<CourseDTO> {
-  const res = await apiClient.patch<CourseDTO>(`/courses/${id}`, input)
+	const res = await apiClient.put<CourseDTO>(`/courses/${id}`, input)
   return res.data
 }
 

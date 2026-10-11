@@ -11,15 +11,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
+import { useI18n } from '@/lib/i18n'
 
 export default function TeacherNewCoursePage() {
   const { org } = useParams<{ org: string }>()
   const router = useRouter()
   const createCourse = useCreateCourse()
+  const { t } = useI18n()
 
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<CourseFormData>({
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CourseFormData>({
     resolver: zodResolver(courseSchema),
     defaultValues: { status: 'draft' },
   })
@@ -27,44 +28,37 @@ export default function TeacherNewCoursePage() {
   const onSubmit = async (data: CourseFormData) => {
     try {
       const course = await createCourse.mutateAsync(data)
-      toast.success('Course created!')
+      toast.success(t('courseCreated'))
       router.push(`/${org}/teacher/courses/${course.id}`)
     } catch {
-      toast.error('Failed to create course')
+      toast.error(t('failedToCreateCourse'))
     }
   }
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <PageHeader title="New Course" />
+      <PageHeader title={t('newCourse')} />
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">{t('title')}</Label>
               <Input id="title" {...register('title')} />
               {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('description')}</Label>
               <Textarea id="description" rows={4} {...register('description')} />
               {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
             </div>
-            <div className="space-y-1.5">
-              <Label>Status</Label>
-              <Select value={watch('status')} onValueChange={(v) => setValue('status', v as 'draft' | 'published')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <p className="text-xs text-[#6b6b6b] rounded-md bg-[#f7f6f3] px-3 py-2.5">
+              New courses start as drafts. An organization administrator can publish them when they are ready.
+            </p>
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Course'}
+                {isSubmitting ? t('creating') : t('createCourse')}
               </Button>
-              <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => router.back()}>{t('cancel')}</Button>
             </div>
           </form>
         </CardContent>

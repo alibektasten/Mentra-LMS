@@ -31,7 +31,7 @@ export function RegisterForm({ defaultOrgSlug }: RegisterFormProps) {
         last_name: data.last_name,
       })
       toast.success('Account created! Please sign in.')
-      router.push(`/login?org=${data.orgSlug}`)
+      router.push(`/${data.orgSlug}/login`)
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: { message?: string } } } }
       toast.error(e?.response?.data?.error?.message ?? 'Registration failed.')

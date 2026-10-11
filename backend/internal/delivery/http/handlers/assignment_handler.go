@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/ailms/backend/internal/application/dto"
@@ -111,6 +112,7 @@ func (h *AssignmentHandler) Delete(c *gin.Context) {
 }
 
 func (h *AssignmentHandler) Submit(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, storage.MaxUploadBytes+1024*1024)
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.Error(apperrors.ValidationError("invalid assignment id"))
@@ -128,6 +130,10 @@ func (h *AssignmentHandler) Submit(c *gin.Context) {
 		defer file.Close()
 		filePath, err = h.storage.Save(file, header, orgID.String())
 		if err != nil {
+			if errors.Is(err, storage.ErrInvalidUpload) {
+				c.Error(apperrors.ValidationError(err.Error()))
+				return
+			}
 			c.Error(apperrors.InternalError("failed to save file: " + err.Error()))
 			return
 		}

@@ -233,7 +233,7 @@ function SubmissionRow({ submission, maxPoints, dueDate, onGrade }: SubmissionRo
             </div>
             <Button
               size="sm"
-              disabled={saving || !score || !hasChanged}
+              disabled={saving || score.trim() === '' || !hasChanged}
               onClick={handleSave}
               className="bg-[#059669] hover:bg-[#047857] text-white"
             >

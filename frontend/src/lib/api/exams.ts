@@ -8,6 +8,7 @@ import {
   UpdateExamInput,
   GradeExamFileInput,
   GrantExtraAttemptInput,
+  ExamMCQAnswerInput,
 } from '@/types/exam'
 
 export async function listExams(courseID: string): Promise<ExamListItemDTO[]> {
@@ -44,6 +45,10 @@ export async function submitExamAttempt(attemptID: string, formData: FormData): 
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return res.data
+}
+
+export async function saveExamDraft(attemptID: string, mcqAnswers: ExamMCQAnswerInput[]): Promise<void> {
+  await apiClient.put(`/exam-attempts/${attemptID}/draft`, { mcq_answers: mcqAnswers })
 }
 
 export async function getMyAttempts(examID: string): Promise<ExamAttemptDTO[]> {

@@ -180,12 +180,17 @@ func TestAssignmentUseCase_GradeSubmission_Success(t *testing.T) {
 
 	graderID := uuid.New()
 	submissionID := uuid.New()
+	assignmentID := uuid.New()
+	orgID := uuid.New()
 	submission := &entities.AssignmentSubmission{
-		ID:          submissionID,
-		TextContent: "student answer",
+		ID:           submissionID,
+		AssignmentID: assignmentID,
+		OrgID:        orgID,
+		TextContent:  "student answer",
 	}
 
 	assignmentRepo.On("FindSubmissionByID", mock.Anything, submissionID).Return(submission, nil)
+	assignmentRepo.On("FindByID", mock.Anything, assignmentID, orgID).Return(&entities.Assignment{ID: assignmentID, OrgID: orgID, MaxPoints: 100}, nil)
 	assignmentRepo.On("UpdateSubmission", mock.Anything, mock.AnythingOfType("*entities.AssignmentSubmission")).Return(nil)
 
 	result, err := uc.GradeSubmission(context.Background(), submissionID, graderID, dto.GradeSubmissionRequest{Score: 85, Feedback: "Well done"})
@@ -193,4 +198,17 @@ func TestAssignmentUseCase_GradeSubmission_Success(t *testing.T) {
 	require.NotNil(t, result.Score)
 	assert.Equal(t, 85, *result.Score)
 	assert.Equal(t, "Well done", result.Feedback)
+}
+
+func TestAssignmentUseCase_GradeSubmission_RejectsScoreAboveMaximum(t *testing.T) {
+	assignmentRepo := new(mocks.MockAssignmentRepository)
+	uc := NewAssignmentUseCase(assignmentRepo, new(mocks.MockModuleRepository))
+	assignmentID, orgID, submissionID := uuid.New(), uuid.New(), uuid.New()
+	submission := &entities.AssignmentSubmission{ID: submissionID, AssignmentID: assignmentID, OrgID: orgID}
+
+	assignmentRepo.On("FindSubmissionByID", mock.Anything, submissionID).Return(submission, nil)
+	assignmentRepo.On("FindByID", mock.Anything, assignmentID, orgID).Return(&entities.Assignment{ID: assignmentID, OrgID: orgID, MaxPoints: 10}, nil)
+
+	_, err := uc.GradeSubmission(context.Background(), submissionID, uuid.New(), dto.GradeSubmissionRequest{Score: 11})
+	require.Error(t, err)
 }

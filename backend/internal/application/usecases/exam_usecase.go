@@ -173,11 +173,12 @@ func (uc *ExamUseCase) StartAttempt(ctx context.Context, examID, studentID, orgI
 	}
 	if active != nil {
 		return &dto.StartAttemptResponse{
-			AttemptID: active.ID.String(),
-			ExamID:    exam.ID.String(),
-			StartedAt: active.StartedAt,
-			ExpiresAt: active.ExpiresAt,
-			Exam:      toExamDTO(exam, false),
+			AttemptID:    active.ID.String(),
+			ExamID:       exam.ID.String(),
+			StartedAt:    active.StartedAt,
+			ExpiresAt:    active.ExpiresAt,
+			SavedAnswers: toExamMCQAnswerInputs(active.MCQAnswers),
+			Exam:         toExamDTO(exam, false),
 		}, nil
 	}
 
@@ -196,16 +197,16 @@ func (uc *ExamUseCase) StartAttempt(ctx context.Context, examID, studentID, orgI
 
 	now := time.Now()
 	attempt := &entities.ExamAttempt{
-		ID:        uuid.New(),
-		ExamID:    examID,
-		StudentID: studentID,
-		OrgID:     orgID,
-		Status:    "in_progress",
-		StartedAt: now,
-		ExpiresAt: now.Add(time.Duration(exam.DurationMinutes) * time.Minute),
+		ID:         uuid.New(),
+		ExamID:     examID,
+		StudentID:  studentID,
+		OrgID:      orgID,
+		Status:     "in_progress",
+		StartedAt:  now,
+		ExpiresAt:  now.Add(time.Duration(exam.DurationMinutes) * time.Minute),
 		FilePoints: exam.FilePoints,
-		CreatedAt: now,
-		UpdatedAt: now,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	if err := uc.attemptRepo.Create(ctx, attempt); err != nil {
@@ -213,12 +214,45 @@ func (uc *ExamUseCase) StartAttempt(ctx context.Context, examID, studentID, orgI
 	}
 
 	return &dto.StartAttemptResponse{
-		AttemptID: attempt.ID.String(),
-		ExamID:    exam.ID.String(),
-		StartedAt: attempt.StartedAt,
-		ExpiresAt: attempt.ExpiresAt,
-		Exam:      toExamDTO(exam, false),
+		AttemptID:    attempt.ID.String(),
+		ExamID:       exam.ID.String(),
+		StartedAt:    attempt.StartedAt,
+		ExpiresAt:    attempt.ExpiresAt,
+		SavedAnswers: []dto.ExamMCQAnswerInput{},
+		Exam:         toExamDTO(exam, false),
 	}, nil
+}
+
+// SaveDraft persists an in-progress MCQ attempt without grading it. Reloading
+// the page therefore cannot consume an attempt or finalise student work.
+func (uc *ExamUseCase) SaveDraft(ctx context.Context, attemptID, studentID uuid.UUID, answers []dto.ExamMCQAnswerInput) error {
+	attempt, err := uc.attemptRepo.FindByID(ctx, attemptID)
+	if err != nil {
+		return err
+	}
+	if attempt.StudentID != studentID {
+		return apperrors.ForbiddenError("not your attempt")
+	}
+	if attempt.Status != "in_progress" {
+		return apperrors.ValidationError("attempt is not in progress")
+	}
+	if time.Now().After(attempt.ExpiresAt) {
+		attempt.Status = "expired"
+		attempt.UpdatedAt = time.Now()
+		_ = uc.attemptRepo.Update(ctx, attempt)
+		return apperrors.ValidationError("exam time has expired")
+	}
+
+	exam, err := uc.examRepo.FindByID(ctx, attempt.ExamID, attempt.OrgID)
+	if err != nil {
+		return err
+	}
+	if err := validateExamAnswers(exam, answers); err != nil {
+		return err
+	}
+	attempt.MCQAnswers = toEntityExamMCQAnswers(answers)
+	attempt.UpdatedAt = time.Now()
+	return uc.attemptRepo.Update(ctx, attempt)
 }
 
 func (uc *ExamUseCase) SubmitAttempt(ctx context.Context, attemptID, studentID uuid.UUID, mcqAnswers []dto.ExamMCQAnswerInput, filePath string) (*dto.ExamAttemptDTO, error) {
@@ -247,16 +281,12 @@ func (uc *ExamUseCase) SubmitAttempt(ctx context.Context, attemptID, studentID u
 	if err != nil {
 		return nil, err
 	}
+	if err := validateExamAnswers(exam, mcqAnswers); err != nil {
+		return nil, err
+	}
 
 	// Convert and store MCQ answers
-	entityAnswers := make([]entities.ExamMCQAnswer, len(mcqAnswers))
-	for i, a := range mcqAnswers {
-		entityAnswers[i] = entities.ExamMCQAnswer{
-			QuestionID: a.QuestionID,
-			AnswerID:   a.AnswerID,
-		}
-	}
-	attempt.MCQAnswers = entityAnswers
+	attempt.MCQAnswers = toEntityExamMCQAnswers(mcqAnswers)
 
 	// Auto-grade MCQ
 	if exam.MCQEnabled && len(exam.Questions) > 0 {
@@ -345,6 +375,9 @@ func (uc *ExamUseCase) GradeFileSection(ctx context.Context, attemptID, graderID
 	exam, err := uc.examRepo.FindByID(ctx, attempt.ExamID, attempt.OrgID)
 	if err != nil {
 		return nil, err
+	}
+	if req.Score < 0 || req.Score > exam.FilePoints {
+		return nil, apperrors.ValidationError("score must be between 0 and the file section maximum")
 	}
 
 	now := time.Now()
@@ -479,13 +512,7 @@ func toExamListItemDTO(e *entities.Exam) *dto.ExamListItemDTO {
 }
 
 func toExamAttemptDTO(a *entities.ExamAttempt) *dto.ExamAttemptDTO {
-	mcqAnswers := make([]dto.ExamMCQAnswerInput, len(a.MCQAnswers))
-	for i, ans := range a.MCQAnswers {
-		mcqAnswers[i] = dto.ExamMCQAnswerInput{
-			QuestionID: ans.QuestionID,
-			AnswerID:   ans.AnswerID,
-		}
-	}
+	mcqAnswers := toExamMCQAnswerInputs(a.MCQAnswers)
 	return &dto.ExamAttemptDTO{
 		ID:           a.ID.String(),
 		ExamID:       a.ExamID.String(),
@@ -504,4 +531,38 @@ func toExamAttemptDTO(a *entities.ExamAttempt) *dto.ExamAttemptDTO {
 		TotalScore:   a.TotalScore,
 		GradedAt:     a.GradedAt,
 	}
+}
+
+func toEntityExamMCQAnswers(answers []dto.ExamMCQAnswerInput) []entities.ExamMCQAnswer {
+	result := make([]entities.ExamMCQAnswer, len(answers))
+	for i, answer := range answers {
+		result[i] = entities.ExamMCQAnswer{QuestionID: answer.QuestionID, AnswerID: answer.AnswerID}
+	}
+	return result
+}
+
+func toExamMCQAnswerInputs(answers []entities.ExamMCQAnswer) []dto.ExamMCQAnswerInput {
+	result := make([]dto.ExamMCQAnswerInput, len(answers))
+	for i, answer := range answers {
+		result[i] = dto.ExamMCQAnswerInput{QuestionID: answer.QuestionID, AnswerID: answer.AnswerID}
+	}
+	return result
+}
+
+func validateExamAnswers(exam *entities.Exam, answers []dto.ExamMCQAnswerInput) error {
+	validAnswers := make(map[string]map[string]bool, len(exam.Questions))
+	for _, question := range exam.Questions {
+		validAnswers[question.ID.String()] = make(map[string]bool, len(question.Answers))
+		for _, answer := range question.Answers {
+			validAnswers[question.ID.String()][answer.ID.String()] = true
+		}
+	}
+	seen := make(map[string]bool, len(answers))
+	for _, answer := range answers {
+		if seen[answer.QuestionID] || !validAnswers[answer.QuestionID][answer.AnswerID] {
+			return apperrors.ValidationError("invalid exam answer")
+		}
+		seen[answer.QuestionID] = true
+	}
+	return nil
 }

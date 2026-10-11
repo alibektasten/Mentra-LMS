@@ -7,12 +7,14 @@ import { useCourses, useDeleteCourse } from '@/lib/queries/courses.queries'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { CourseGrid } from '@/components/courses/CourseGrid'
+import { useI18n } from '@/lib/i18n'
 
 export default function TeacherCoursesPage() {
   const { org } = useParams<{ org: string }>()
   const router = useRouter()
   const { data, isLoading } = useCourses()
   const deleteCourse = useDeleteCourse()
+  const { t } = useI18n()
 
   const handleDelete = async (id: string) => {
     try {
@@ -26,10 +28,10 @@ export default function TeacherCoursesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="My Courses"
+        title={t('myCourses')}
         actions={
           <Button onClick={() => router.push(`/${org}/teacher/courses/new`)}>
-            <Plus className="h-4 w-4 mr-2" /> New Course
+            <Plus className="h-4 w-4 mr-2" /> {t('newCourse')}
           </Button>
         }
       />

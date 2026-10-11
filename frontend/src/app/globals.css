@@ -4,24 +4,24 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --background: 48 33% 98%;
+    --foreground: 240 6% 8%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 240 6% 8%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 161 94% 30%;
+    --popover-foreground: 240 6% 8%;
+    --primary: 160 84% 25%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --secondary: 48 25% 95%;
+    --secondary-foreground: 240 6% 8%;
+    --muted: 48 20% 95%;
+    --muted-foreground: 240 4% 42%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 161 94% 30%;
-    --radius: 0.5rem;
+    --border: 40 12% 88%;
+    --input: 40 12% 88%;
+    --ring: 160 84% 25%;
+    --radius: 0.75rem;
   }
 
   * {
@@ -34,21 +34,132 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 14px;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
+  html[data-theme='dark'] {
+    color-scheme: dark;
+    --background: 100 8% 9%;
+    --foreground: 120 12% 94%;
+    --card: 100 7% 13%;
+    --card-foreground: 120 12% 94%;
+    --popover: 100 7% 13%;
+    --popover-foreground: 120 12% 94%;
+    --secondary: 100 6% 17%;
+    --secondary-foreground: 120 12% 94%;
+    --muted: 100 6% 17%;
+    --muted-foreground: 100 6% 68%;
+    --border: 100 5% 27%;
+    --input: 100 5% 27%;
+  }
+  html[data-theme='dark'] body { background: #151714; color: #f0f4ef; }
+  html[data-theme='dark'] .app-canvas { background: linear-gradient(180deg, #151714 0%, #101210 100%); }
+  html[data-theme='dark'] .app-canvas [class*='bg-white'],
+  html[data-theme='dark'] .app-canvas [class*='bg-[#fb'],
+  html[data-theme='dark'] .app-canvas [class*='bg-[#f6'],
+  html[data-theme='dark'] .app-canvas [class*='bg-[#f7'],
+  html[data-theme='dark'] .app-canvas [class*='bg-[#f8'],
+  html[data-theme='dark'] .app-canvas [class*='bg-[#f0'],
+  html[data-theme='dark'] .app-canvas [class*='bg-emerald-50'],
+  html[data-theme='dark'] .app-canvas [class*='bg-violet-50'],
+  html[data-theme='dark'] .app-canvas [class*='bg-sky-50'],
+  html[data-theme='dark'] .app-canvas [class*='bg-amber-50'] { background-color: #20231f !important; }
+  html[data-theme='dark'] .app-canvas [class*='bg-[linear-gradient'] {
+    background-image: linear-gradient(145deg, #252a25, #1d211d) !important;
+  }
+  html[data-theme='dark'] .app-canvas button:disabled {
+    background-color: #354039 !important;
+    color: #c3cbc5 !important;
+    opacity: 1;
+  }
+  html[data-theme='dark'] .app-canvas [class*='text-[#'] { color: #edf2ec !important; }
+  html[data-theme='dark'] .app-canvas input,
+  html[data-theme='dark'] .app-canvas select { background-color: #20231f !important; color: #edf2ec; }
+  html[data-theme='dark'] .app-canvas h1,
+  html[data-theme='dark'] .app-canvas h2,
+  html[data-theme='dark'] .app-canvas h3,
+  html[data-theme='dark'] .app-canvas .text-ink,
+  html[data-theme='dark'] .app-canvas .text-ink-muted { color: #edf2ec !important; }
+  html[data-theme='dark'] .app-canvas nav a[data-active='true'],
+  html[data-theme='dark'] .app-canvas nav a[data-active='true'] svg {
+    background-color: #075e46 !important;
+    color: #ecfdf5 !important;
+  }
+  html[data-theme='dark'] #notification-panel,
+  html[data-theme='dark'] [data-radix-popper-content-wrapper] [role='menu'] {
+    background: #20231f !important;
+    border-color: #3c423b !important;
+    color: #edf2ec !important;
+  }
+  html[data-theme='dark'] #notification-panel [class*='text-[#'],
+  html[data-theme='dark'] [data-radix-popper-content-wrapper] [class*='text-[#'] { color: #edf2ec !important; }
+  html[data-theme='dark'] #notification-panel [class*='border-[#'],
+  html[data-theme='dark'] [data-radix-popper-content-wrapper] [class*='border-[#'] { border-color: #3c423b !important; }
+  /* AI generators deliberately use bright marketing gradients in light mode.
+     Give these named surfaces a stable dark counterpart instead of relying on
+     fragile Tailwind arbitrary-value selectors. */
+  html[data-theme='dark'] .app-canvas .ai-generator-surface {
+    background: #20251f !important;
+    border-color: #455047 !important;
+    color: #edf2ec;
+  }
+  html[data-theme='dark'] .app-canvas .ai-generator-surface--emerald { box-shadow: inset 0 1px 0 rgba(110, 231, 183, 0.12); }
+  html[data-theme='dark'] .app-canvas .ai-generator-surface--sky { box-shadow: inset 0 1px 0 rgba(125, 211, 252, 0.12); }
+  html[data-theme='dark'] .app-canvas .ai-generator-surface--violet { box-shadow: inset 0 1px 0 rgba(196, 181, 253, 0.12); }
+  html[data-theme='dark'] .app-canvas .ai-generator-surface [class*='border-[#'] { border-color: #455047 !important; }
+  html[data-theme='dark'] .app-canvas .ai-generator-surface [class*='bg-white'] { background-color: #181b18 !important; }
+  html[data-ui-size='small'] { font-size: 13px; }
+  html[data-ui-size='large'] { font-size: 16px; }
+
   h1, h2, h3, h4, h5, h6 {
     @apply text-ink font-semibold;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
+  }
+
+  ::selection {
+    background: #a7f3d0;
+    color: #10221b;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #d7d5cf transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-color: #d7d5cf;
+    background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
   }
 }
 
 @layer utilities {
   .sidebar-width {
-    width: 240px;
+    width: 264px;
+  }
+
+  .app-canvas {
+    background:
+      radial-gradient(circle at 100% 0%, rgba(167, 243, 208, 0.22), transparent 26rem),
+      linear-gradient(180deg, #fbfbf9 0%, #f7f7f4 100%);
+  }
+
+  .content-surface {
+    box-shadow: 0 18px 50px rgba(32, 31, 27, 0.04);
   }
 
   /* Gradient text */

@@ -55,6 +55,17 @@ func (uc *FileAttachmentUseCase) ListByRef(ctx context.Context, refType string, 
 	return result, nil
 }
 
+func (uc *FileAttachmentUseCase) GetAttachment(ctx context.Context, id, orgID uuid.UUID) (*dto.FileAttachmentDTO, error) {
+	f, err := uc.fileAttachmentRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if f.OrgID != orgID {
+		return nil, apperrors.ForbiddenError("access denied")
+	}
+	return toFileAttachmentDTO(f), nil
+}
+
 func (uc *FileAttachmentUseCase) DeleteAttachment(ctx context.Context, id, orgID uuid.UUID) error {
 	f, err := uc.fileAttachmentRepo.FindByID(ctx, id)
 	if err != nil {

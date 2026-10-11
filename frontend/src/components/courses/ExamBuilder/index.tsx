@@ -11,12 +11,14 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ExamFormDialog } from './ExamFormDialog'
+import { useI18n } from '@/lib/i18n'
 
 interface ExamBuilderProps {
   courseId: string
 }
 
 export function ExamBuilder({ courseId }: ExamBuilderProps) {
+  const { t } = useI18n()
   const { org } = useParams<{ org: string }>()
   const { data: exams, isLoading } = useExams(courseId)
   const deleteExam = useDeleteExam(courseId)
@@ -39,9 +41,9 @@ export function ExamBuilder({ courseId }: ExamBuilderProps) {
     if (!deleteTarget) return
     try {
       await deleteExam.mutateAsync(deleteTarget.id)
-      toast.success('Exam deleted')
+      toast.success(t('examDeleted'))
     } catch {
-      toast.error('Failed to delete exam')
+      toast.error(t('failedToDeleteExam'))
     } finally {
       setDeleteTarget(null)
     }
@@ -75,14 +77,14 @@ export function ExamBuilder({ courseId }: ExamBuilderProps) {
           onClick={handleCreate}
         >
           <Plus className="h-4 w-4" />
-          New Exam
+          {t('newExam')}
         </Button>
       </div>
 
       {examList.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-14 rounded-xl border border-dashed border-[#e4e2de]">
           <GraduationCap className="h-8 w-8 text-[#d4d2ce] mb-2" />
-          <p className="text-sm text-[#9b9b9b]">No exams yet. Create the first exam.</p>
+          <p className="text-sm text-[#9b9b9b]">{t('noExamsToCreate')}</p>
         </div>
       ) : (
         <div className="space-y-2">

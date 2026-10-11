@@ -26,6 +26,7 @@ func (uc *UserUseCase) GetProfile(ctx context.Context, userID uuid.UUID) (*dto.P
 		ID:        user.ID.String(),
 		Email:     user.Email,
 		Name:      user.Name,
+		AvatarURL: user.AvatarURL,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 	}, nil
@@ -42,6 +43,7 @@ func (uc *UserUseCase) UpdateProfile(ctx context.Context, userID uuid.UUID, req 
 	}
 
 	user.Name = req.Name
+	user.AvatarURL = req.AvatarURL
 
 	if err := uc.userRepo.Update(ctx, user); err != nil {
 		return nil, apperrors.InternalError("failed to update profile")
@@ -51,6 +53,7 @@ func (uc *UserUseCase) UpdateProfile(ctx context.Context, userID uuid.UUID, req 
 		ID:        user.ID.String(),
 		Email:     user.Email,
 		Name:      user.Name,
+		AvatarURL: user.AvatarURL,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 	}, nil

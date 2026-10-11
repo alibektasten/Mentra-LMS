@@ -21,6 +21,7 @@ type User struct {
 	Email        string
 	PasswordHash string
 	Name         string
+	AvatarURL    string
 	Role         string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

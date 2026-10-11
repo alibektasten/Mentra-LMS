@@ -100,3 +100,22 @@ func TestFileAttachmentUseCase_CreateAttachment_InvalidRefID(t *testing.T) {
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, http.StatusUnprocessableEntity, appErr.HTTPStatus)
 }
+
+func TestFileAttachmentUseCase_GetAttachment_RejectsCrossOrgAccess(t *testing.T) {
+	fileAttachmentRepo := new(mocks.MockFileAttachmentRepository)
+	uc := NewFileAttachmentUseCase(fileAttachmentRepo)
+
+	attachmentID := uuid.New()
+	attachmentOrgID := uuid.New()
+	requestOrgID := uuid.New()
+	fileAttachmentRepo.On("FindByID", mock.Anything, attachmentID).
+		Return(&entities.FileAttachment{ID: attachmentID, OrgID: attachmentOrgID}, nil).Once()
+
+	_, err := uc.GetAttachment(context.Background(), attachmentID, requestOrgID)
+
+	require.Error(t, err)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, http.StatusForbidden, appErr.HTTPStatus)
+	fileAttachmentRepo.AssertExpectations(t)
+}

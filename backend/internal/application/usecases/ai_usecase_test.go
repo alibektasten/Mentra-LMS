@@ -18,8 +18,9 @@ import (
 func TestAIUseCase_SummarizeLesson_Success(t *testing.T) {
 	lessonRepo := new(mocks.MockLessonRepository)
 	quizRepo := new(mocks.MockQuizRepository)
+	assignmentRepo := new(mocks.MockAssignmentRepository)
 	aiService := new(mocks.MockAIService)
-	uc := NewAIUseCase(lessonRepo, quizRepo, aiService)
+	uc := NewAIUseCase(lessonRepo, quizRepo, assignmentRepo, aiService)
 
 	orgID := uuid.New()
 	lessonID := uuid.New()
@@ -41,8 +42,9 @@ func TestAIUseCase_SummarizeLesson_Success(t *testing.T) {
 func TestAIUseCase_SummarizeLesson_LessonNotFound(t *testing.T) {
 	lessonRepo := new(mocks.MockLessonRepository)
 	quizRepo := new(mocks.MockQuizRepository)
+	assignmentRepo := new(mocks.MockAssignmentRepository)
 	aiService := new(mocks.MockAIService)
-	uc := NewAIUseCase(lessonRepo, quizRepo, aiService)
+	uc := NewAIUseCase(lessonRepo, quizRepo, assignmentRepo, aiService)
 
 	orgID := uuid.New()
 	lessonID := uuid.New()
@@ -58,8 +60,9 @@ func TestAIUseCase_SummarizeLesson_LessonNotFound(t *testing.T) {
 func TestAIUseCase_SummarizeLesson_AIServiceFails(t *testing.T) {
 	lessonRepo := new(mocks.MockLessonRepository)
 	quizRepo := new(mocks.MockQuizRepository)
+	assignmentRepo := new(mocks.MockAssignmentRepository)
 	aiService := new(mocks.MockAIService)
-	uc := NewAIUseCase(lessonRepo, quizRepo, aiService)
+	uc := NewAIUseCase(lessonRepo, quizRepo, assignmentRepo, aiService)
 
 	orgID := uuid.New()
 	lessonID := uuid.New()
@@ -75,8 +78,9 @@ func TestAIUseCase_SummarizeLesson_AIServiceFails(t *testing.T) {
 func TestAIUseCase_GenerateQuiz_Success(t *testing.T) {
 	lessonRepo := new(mocks.MockLessonRepository)
 	quizRepo := new(mocks.MockQuizRepository)
+	assignmentRepo := new(mocks.MockAssignmentRepository)
 	aiService := new(mocks.MockAIService)
-	uc := NewAIUseCase(lessonRepo, quizRepo, aiService)
+	uc := NewAIUseCase(lessonRepo, quizRepo, assignmentRepo, aiService)
 
 	orgID := uuid.New()
 	lessonID := uuid.New()

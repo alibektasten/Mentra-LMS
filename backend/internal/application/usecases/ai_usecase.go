@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"strings"
 
 	"github.com/ailms/backend/internal/application/dto"
 	"github.com/ailms/backend/internal/domain/repositories"
@@ -31,6 +32,9 @@ func (uc *AIUseCase) SummarizeLesson(ctx context.Context, lessonID, orgID uuid.U
 	if err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(lesson.Content) == "" {
+		return nil, apperrors.ValidationError("lesson has no text content to summarize")
+	}
 
 	summary, err := uc.aiService.GenerateLessonSummary(ctx, lesson.Content)
 	if err != nil {
@@ -44,6 +48,9 @@ func (uc *AIUseCase) GenerateQuiz(ctx context.Context, lessonID, orgID uuid.UUID
 	lesson, err := uc.lessonRepo.FindByID(ctx, lessonID, orgID)
 	if err != nil {
 		return nil, err
+	}
+	if strings.TrimSpace(lesson.Content) == "" {
+		return nil, apperrors.ValidationError("lesson has no text content to generate a quiz")
 	}
 
 	questions, err := uc.aiService.GenerateQuiz(ctx, lesson.Content, numQuestions)
@@ -109,6 +116,9 @@ func (uc *AIUseCase) GenerateFlashcards(ctx context.Context, lessonID, orgID uui
 	lesson, err := uc.lessonRepo.FindByID(ctx, lessonID, orgID)
 	if err != nil {
 		return nil, err
+	}
+	if strings.TrimSpace(lesson.Content) == "" {
+		return nil, apperrors.ValidationError("lesson has no text content to generate flashcards")
 	}
 	cards, err := uc.aiService.GenerateFlashcards(ctx, lesson.Content, numCards)
 	if err != nil {

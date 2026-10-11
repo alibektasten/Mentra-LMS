@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, CheckCircle, BookOpen, Video, HelpCircle, FileIcon, Link2, Layers } from 'lucide-react'
+import { ChevronLeft, CheckCircle, BookOpen, Video, HelpCircle, FileIcon, Link2, Layers, Paperclip, Download } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useModules } from '@/lib/queries/modules.queries'
@@ -17,6 +17,9 @@ import { LessonDTO, LessonType } from '@/types/lesson'
 import { cn } from '@/lib/utils/cn'
 import { useGenerateFlashcards } from '@/lib/queries/ai.queries'
 import { FlashcardDTO } from '@/lib/api/ai'
+import { useAttachments } from '@/lib/queries/attachments.queries'
+import { UPLOAD_BASE_URL } from '@/lib/api/client'
+import { getApiErrorMessage } from '@/lib/api/error-message'
 
 const lessonTypeBadge: Record<LessonType, string> = {
   video: 'text-sky-600 bg-sky-50',
@@ -57,6 +60,7 @@ export default function LessonPage() {
   const router = useRouter()
 
   const { data: lesson, isLoading } = useLessonFromCourse(courseId, lessonId)
+  const { data: attachments = [] } = useAttachments('lesson', lessonId)
   const markComplete = useMarkComplete()
   const { data: progressList } = useProgress(courseId)
   const isCompleted = Array.isArray(progressList)
@@ -70,8 +74,8 @@ export default function LessonPage() {
     try {
       const cards = await generateFlashcards.mutateAsync({ lessonId, numCards: 8 })
       setFlashcards(cards)
-    } catch {
-      toast.error('Failed to generate flashcards. Check that the lesson has content.')
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Не удалось создать карточки. Попробуйте ещё раз.'))
     }
   }
 
@@ -145,6 +149,30 @@ export default function LessonPage() {
           <LessonViewer lesson={lesson} onQuizComplete={handleQuizComplete} />
         </div>
       </div>
+
+      {attachments.length > 0 && (
+        <section className="mt-6 rounded-lg border border-[#e8e8e6] overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-[#e8e8e6] bg-[#fbfbfa] px-5 py-3">
+            <Paperclip className="h-3.5 w-3.5 text-[#6b6b6b]" />
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#6b6b6b]">Lesson resources</p>
+          </div>
+          <div className="divide-y divide-[#e8e8e6]">
+            {attachments.map((attachment) => (
+              <a
+                key={attachment.id}
+                href={`${UPLOAD_BASE_URL}/${attachment.stored_path}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                className="flex items-center gap-3 px-5 py-3 text-sm text-[#059669] hover:bg-[#f7f7f5] transition-colors"
+              >
+                <Download className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{attachment.original_name}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Actions */}
       {lesson.type !== 'quiz' && (

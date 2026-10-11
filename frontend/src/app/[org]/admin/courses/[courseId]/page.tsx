@@ -79,7 +79,9 @@ export default function AdminCourseDetailPage() {
             'shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest px-2 py-1 rounded-full border',
             status === 'published'
               ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-              : 'text-amber-700 bg-amber-50 border-amber-200',
+              : status === 'archived'
+                ? 'text-slate-700 bg-slate-100 border-slate-200'
+                : 'text-amber-700 bg-amber-50 border-amber-200',
           )}>
             {status === 'published' ? <Globe className="h-2.5 w-2.5" /> : <FileEdit className="h-2.5 w-2.5" />}
             {status}
@@ -178,7 +180,7 @@ export default function AdminCourseDetailPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-wide">Status</Label>
-                <Select value={watch('status')} onValueChange={(v) => setValue('status', v as 'draft' | 'published')}>
+                <Select value={watch('status')} onValueChange={(v) => setValue('status', v as 'draft' | 'published' | 'archived')}>
                   <SelectTrigger className="w-44 border-[#e4e2de]">
                     <SelectValue />
                   </SelectTrigger>
@@ -193,6 +195,12 @@ export default function AdminCourseDetailPage() {
                       <span className="flex items-center gap-2">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
                         Published
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="archived">
+                      <span className="flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400 inline-block" />
+                        Archived
                       </span>
                     </SelectItem>
                   </SelectContent>

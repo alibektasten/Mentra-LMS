@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, GraduationCap, Clock, AlertCircle, CheckCircle2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import { useExam, useMyAttempts, useStartExamAttempt, useSubmitExamAttempt } from '@/lib/queries/exams.queries'
+import { useExam, useMyAttempts, useStartExamAttempt, useSubmitExamAttempt, useSaveExamDraft } from '@/lib/queries/exams.queries'
 import { ExamAttemptDTO, ExamMCQAnswerInput, StartAttemptResponse } from '@/types/exam'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -53,6 +53,7 @@ export default function StudentExamPage() {
   const { data: attempts, isLoading: attemptsLoading } = useMyAttempts(examId)
   const startAttempt = useStartExamAttempt(examId)
   const submitAttempt = useSubmitExamAttempt(examId)
+  const saveDraft = useSaveExamDraft()
 
   const [phase, setPhase] = useState<Phase>('landing')
   const [activeAttempt, setActiveAttempt] = useState<StartAttemptResponse | null>(null)
@@ -60,6 +61,7 @@ export default function StudentExamPage() {
   const [file, setFile] = useState<File | null>(null)
   const [lastResult, setLastResult] = useState<ExamAttemptDTO | null>(null)
   const autoSubmitRef = useRef(false)
+  const hydratedDraftRef = useRef(false)
 
   // Resume active attempt on load
   useEffect(() => {
@@ -69,6 +71,8 @@ export default function StudentExamPage() {
       // Re-call start to get exam data back
       startAttempt.mutateAsync().then((res) => {
         setActiveAttempt(res)
+        setMcqAnswers(Object.fromEntries(res.saved_answers.map((answer) => [answer.question_id, answer.answer_id])))
+        hydratedDraftRef.current = true
         setPhase('active')
       }).catch(() => {})
     }
@@ -79,6 +83,18 @@ export default function StudentExamPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempts, exam])
+
+  // Save MCQ answers after a short pause. Files are sent only on final submit,
+  // while every selected answer can safely survive a refresh or temporary loss
+  // of connectivity.
+  useEffect(() => {
+    if (phase !== 'active' || !activeAttempt || !hydratedDraftRef.current) return
+    const timer = window.setTimeout(() => {
+      const answers: ExamMCQAnswerInput[] = Object.entries(mcqAnswers).map(([question_id, answer_id]) => ({ question_id, answer_id }))
+      saveDraft.mutate({ attemptID: activeAttempt.attempt_id, mcqAnswers: answers })
+    }, 750)
+    return () => window.clearTimeout(timer)
+  }, [activeAttempt, mcqAnswers, phase, saveDraft])
 
   const doSubmit = useCallback(async (expired = false) => {
     if (!activeAttempt || autoSubmitRef.current) return
@@ -111,9 +127,10 @@ export default function StudentExamPage() {
     try {
       const res = await startAttempt.mutateAsync()
       setActiveAttempt(res)
-      setMcqAnswers({})
+      setMcqAnswers(Object.fromEntries(res.saved_answers.map((answer) => [answer.question_id, answer.answer_id])))
       setFile(null)
       autoSubmitRef.current = false
+      hydratedDraftRef.current = true
       setPhase('active')
     } catch (err) {
       const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message

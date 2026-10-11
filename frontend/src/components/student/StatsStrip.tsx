@@ -2,6 +2,7 @@
 
 import { ProgressDTO } from '@/types/progress'
 import { CourseDTO } from '@/types/course'
+import { useI18n } from '@/lib/i18n'
 
 interface StatsStripProps {
   progress: ProgressDTO[]
@@ -9,6 +10,7 @@ interface StatsStripProps {
 }
 
 export function StatsStrip({ progress, courses }: StatsStripProps) {
+  const { t } = useI18n()
   const completed = progress.filter((p) => !!p.completed_at)
   const withScore = completed.filter((p) => p.score != null)
   const avgScore = withScore.length
@@ -20,10 +22,10 @@ export function StatsStrip({ progress, courses }: StatsStripProps) {
     : null
 
   const stats = [
-    { label: 'Lessons completed', value: completed.length },
-    { label: 'Average score', value: avgScore != null ? `${avgScore}%` : '—' },
-    { label: 'Active courses', value: activeCourses },
-    { label: 'Completion rate', value: completionRate != null ? `${completionRate}%` : '—' },
+    { label: t('lessonsCompleted'), value: completed.length },
+    { label: t('averageScore'), value: avgScore != null ? `${avgScore}%` : '—' },
+    { label: t('activeCourses'), value: activeCourses },
+    { label: t('completionRate'), value: completionRate != null ? `${completionRate}%` : '—' },
   ]
 
   return (

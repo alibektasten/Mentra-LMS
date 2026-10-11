@@ -113,6 +113,25 @@ func (uc *AuthUseCase) Login(ctx context.Context, req dto.LoginRequest, orgSlug 
 	return uc.generateToken(user, org.ID, role)
 }
 
+// LoginWithOAuth turns a verified provider email into a tenant session. OAuth
+// providers do not create memberships: an administrator must invite the user
+// first, preserving organization boundaries.
+func (uc *AuthUseCase) LoginWithOAuth(ctx context.Context, email, orgSlug string) (*dto.TokenResponse, error) {
+	user, err := uc.userRepo.FindByEmail(ctx, email)
+	if err != nil {
+		return nil, apperrors.UnauthorizedError("this Google account is not registered")
+	}
+	org, err := uc.orgRepo.FindBySlug(ctx, orgSlug)
+	if err != nil {
+		return nil, apperrors.NotFoundError("organization", orgSlug)
+	}
+	role, err := uc.memberRepo.FindUserRole(ctx, user.ID, org.ID)
+	if err != nil {
+		return nil, apperrors.ForbiddenError("this Google account is not a member of this organization")
+	}
+	return uc.generateToken(user, org.ID, role)
+}
+
 func (uc *AuthUseCase) SuperAdminLogin(ctx context.Context, req dto.LoginRequest) (*dto.TokenResponse, error) {
 	user, err := uc.userRepo.FindByEmail(ctx, req.Email)
 	if err != nil {

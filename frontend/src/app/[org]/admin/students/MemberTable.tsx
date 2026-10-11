@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MemberDTO, MemberRole } from '@/types/member'
+import { useI18n } from '@/lib/i18n'
 
 const ROLE_COLORS: Record<MemberRole, string> = {
   admin: 'bg-purple-50 text-purple-700 border-purple-200',
@@ -18,6 +19,7 @@ const ROLE_COLORS: Record<MemberRole, string> = {
 }
 
 function RoleFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { t } = useI18n()
   return (
     <div className="flex gap-1.5">
       {(['', 'admin', 'teacher', 'student'] as const).map((r) => (
@@ -30,7 +32,7 @@ function RoleFilter({ value, onChange }: { value: string; onChange: (v: string) 
               : 'border-[#e4e2de] bg-white text-[#6b6b6b] hover:border-[#059669]'
           }`}
         >
-          {r === '' ? 'All' : r.charAt(0).toUpperCase() + r.slice(1) + 's'}
+          {r === '' ? t('all') : r === 'student' ? t('students') : r === 'teacher' ? t('teacher') : 'Admin'}
         </button>
       ))}
     </div>
@@ -38,15 +40,16 @@ function RoleFilter({ value, onChange }: { value: string; onChange: (v: string) 
 }
 
 function MemberRow({ member }: { member: MemberDTO }) {
+  const { t } = useI18n()
   const remove = useRemoveMember()
   const updateRole = useUpdateMemberRole()
 
   const handleRoleChange = async (newRole: string) => {
     try {
       await updateRole.mutateAsync({ id: member.id, input: { role: newRole as MemberRole } })
-      toast.success('Role updated')
+      toast.success(t('roleUpdated'))
     } catch {
-      toast.error('Failed to update role')
+      toast.error(t('failedToUpdateRole'))
     }
   }
 
@@ -54,9 +57,9 @@ function MemberRow({ member }: { member: MemberDTO }) {
     if (!confirm(`Remove ${member.name} from the organization?`)) return
     try {
       await remove.mutateAsync(member.id)
-      toast.success('Member removed')
+      toast.success(t('memberRemoved'))
     } catch {
-      toast.error('Failed to remove member')
+      toast.error(t('failedToRemoveMember'))
     }
   }
 
@@ -88,7 +91,7 @@ function MemberRow({ member }: { member: MemberDTO }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             <div className="px-2 py-1.5">
-              <p className="text-xs text-[#9b9b9b] mb-1">Change role</p>
+              <p className="text-xs text-[#9b9b9b] mb-1">{t('changeRole')}</p>
               <Select value={member.role} onValueChange={handleRoleChange}>
                 <SelectTrigger className="h-7 text-xs border-[#e4e2de]">
                   <SelectValue />
@@ -106,7 +109,7 @@ function MemberRow({ member }: { member: MemberDTO }) {
               onClick={handleRemove}
             >
               <Trash2 className="h-3.5 w-3.5 mr-2" />
-              Remove member
+              {t('removeMember')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -116,6 +119,7 @@ function MemberRow({ member }: { member: MemberDTO }) {
 }
 
 export function MemberTable() {
+  const { t } = useI18n()
   const [roleFilter, setRoleFilter] = useState('')
   const [page, setPage] = useState(1)
   const pageSize = 20
@@ -135,10 +139,10 @@ export function MemberTable() {
       <div className="rounded-xl border border-[#e4e2de] bg-white divide-y divide-[#f0eeeb] shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 bg-[#fafaf9] rounded-t-xl">
-          <span className="text-xs font-semibold text-[#9b9b9b] uppercase tracking-wide">Member</span>
+          <span className="text-xs font-semibold text-[#9b9b9b] uppercase tracking-wide">{t('member')}</span>
           <div className="flex items-center gap-11">
-            <span className="text-xs font-semibold text-[#9b9b9b] uppercase tracking-wide">Role</span>
-            <span className="text-xs font-semibold text-[#9b9b9b] uppercase tracking-wide hidden sm:block">Joined</span>
+            <span className="text-xs font-semibold text-[#9b9b9b] uppercase tracking-wide">{t('role')}</span>
+            <span className="text-xs font-semibold text-[#9b9b9b] uppercase tracking-wide hidden sm:block">{t('joined')}</span>
             <span className="w-7" />
           </div>
         </div>
@@ -150,7 +154,7 @@ export function MemberTable() {
             </div>
           ))
         ) : members.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-[#9b9b9b]">No members found</div>
+          <div className="px-4 py-10 text-center text-sm text-[#9b9b9b]">{t('noMembersFound')}</div>
         ) : (
           members.map((m) => <MemberRow key={m.id} member={m} />)
         )}
@@ -165,9 +169,9 @@ export function MemberTable() {
             onClick={() => setPage((p) => p - 1)}
             className="border-[#e4e2de] text-xs"
           >
-            Previous
+            {t('previous')}
           </Button>
-          <span className="text-xs text-[#9b9b9b]">Page {page} of {totalPages}</span>
+          <span className="text-xs text-[#9b9b9b]">{t('page')} {page} {t('of')} {totalPages}</span>
           <Button
             variant="outline"
             size="sm"
@@ -175,7 +179,7 @@ export function MemberTable() {
             onClick={() => setPage((p) => p + 1)}
             className="border-[#e4e2de] text-xs"
           >
-            Next
+            {t('next')}
           </Button>
         </div>
       )}

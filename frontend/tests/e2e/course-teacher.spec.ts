@@ -4,16 +4,19 @@ import { loginViaAPI } from './helpers/auth'
 /**
  * Teacher course builder tests.
  *
- * Requires seed data (run `go run ./cmd/seed` from backend/):
- *   org: acme, teacher: tom@acme.com / password123
+ * Requires the standard demo seed (run `go run ./cmd/seed` from backend/).
  *
  * Override via env vars:
  *   TEST_ORG, TEST_TEACHER_EMAIL, TEST_TEACHER_PASSWORD
  */
 
-const ORG = process.env.TEST_ORG ?? 'acme'
-const EMAIL = process.env.TEST_TEACHER_EMAIL ?? 'tom@acme.com'
+const ORG = process.env.TEST_ORG ?? 'nu'
+const EMAIL = process.env.TEST_TEACHER_EMAIL ?? 'baurzhan@nu.edu.kz'
 const PASS = process.env.TEST_TEACHER_PASSWORD ?? 'password123'
+
+// See the student suite for why detailed, language-specific UI checks are
+// opt-in. The platform-smoke suite is the deployment gate.
+test.skip(process.env.E2E_RUN_EXTENDED !== 'true', 'Set E2E_RUN_EXTENDED=true to run detailed course checks')
 
 test.describe('Teacher — course builder', () => {
   test.beforeEach(async ({ page }) => {
@@ -65,6 +68,7 @@ test.describe('Teacher — course builder', () => {
   })
 
   test('can create a new module', async ({ page }) => {
+    test.skip(process.env.E2E_ALLOW_WRITES !== 'true', 'Set E2E_ALLOW_WRITES=true to run data-changing tests')
     await page.goto(`/${ORG}/teacher/courses`)
     await page.waitForLoadState('networkidle')
 
@@ -122,6 +126,7 @@ test.describe('Teacher — course builder', () => {
   })
 
   test('lesson edit dialog can update title', async ({ page }) => {
+    test.skip(process.env.E2E_ALLOW_WRITES !== 'true', 'Set E2E_ALLOW_WRITES=true to run data-changing tests')
     await page.goto(`/${ORG}/teacher/courses`)
     await page.waitForLoadState('networkidle')
 

@@ -1,0 +1,27 @@
+{
+  email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+  encode zstd gzip
+
+  # The backend accepts at most 10 MiB of uploaded content. Keep the edge
+  # limit slightly above it for multipart request overhead.
+  request_body {
+    max_size 12MB
+  }
+
+  @api path /api/*
+  handle @api {
+    reverse_proxy app:8080
+  }
+
+  @uploads path /uploads/*
+  handle @uploads {
+    root * /srv/uploads
+    header Cache-Control "public, max-age=2592000, immutable"
+    file_server
+  }
+
+  reverse_proxy frontend:3000
+}

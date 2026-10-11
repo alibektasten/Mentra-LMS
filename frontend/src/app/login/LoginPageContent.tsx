@@ -8,5 +8,5 @@ export function LoginPageContent() {
   const org = searchParams.get('org') ?? ''
   const returnTo = searchParams.get('returnTo') ?? ''
 
-  return <LoginForm orgSlug={org} returnTo={returnTo} isSuperAdmin={true} />
+  return <LoginForm orgSlug={org} returnTo={returnTo} isSuperAdmin={!org} />
 }

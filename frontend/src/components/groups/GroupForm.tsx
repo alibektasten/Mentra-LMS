@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { useI18n } from '@/lib/i18n'
 
 interface GroupFormProps {
   open: boolean
@@ -17,6 +18,7 @@ interface GroupFormProps {
 }
 
 export function GroupForm({ open, onOpenChange, onSubmit, defaultValues, isPending }: GroupFormProps) {
+  const { t } = useI18n()
   const [name, setName] = useState('')
   const [teacherSearch, setTeacherSearch] = useState('')
   const [selectedTeacherId, setSelectedTeacherId] = useState('')
@@ -82,11 +84,11 @@ export function GroupForm({ open, onOpenChange, onSubmit, defaultValues, isPendi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{defaultValues ? 'Edit Group' : 'Create Group'}</DialogTitle>
+          <DialogTitle>{defaultValues ? t('editGroup') : t('createGroup')}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label>Group Name</Label>
+            <Label>{t('groupName')}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -96,7 +98,7 @@ export function GroupForm({ open, onOpenChange, onSubmit, defaultValues, isPendi
           </div>
           <div className="space-y-1.5">
             <Label>
-              Teacher <span className="text-[#9b9b9b] font-normal">(optional)</span>
+              {t('teacher')} <span className="text-[#9b9b9b] font-normal">({t('optional')})</span>
             </Label>
             <div className="relative">
               <Input
@@ -142,13 +144,13 @@ export function GroupForm({ open, onOpenChange, onSubmit, defaultValues, isPendi
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t('cancel')}</Button>
           <Button
             onClick={handleSubmit}
             disabled={isPending || !name.trim()}
             className="bg-[#059669] hover:bg-[#047857] text-white"
           >
-            {isPending ? 'Saving...' : defaultValues ? 'Save Changes' : 'Create Group'}
+            {isPending ? t('saving') : defaultValues ? t('saveChanges') : t('createGroup')}
           </Button>
         </DialogFooter>
       </DialogContent>

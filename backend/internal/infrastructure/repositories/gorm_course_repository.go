@@ -44,7 +44,7 @@ func (r *GORMCourseRepository) FindByOrg(ctx context.Context, orgID uuid.UUID, p
 		return nil, 0, apperrors.InternalError(err.Error())
 	}
 	err = r.db.WithContext(ctx).Where("org_id = ?", orgID.String()).
-		Offset((page-1)*pageSize).Limit(pageSize).
+		Offset((page - 1) * pageSize).Limit(pageSize).
 		Order("created_at DESC").Find(&models).Error
 	if err != nil {
 		return nil, 0, apperrors.InternalError(err.Error())
@@ -57,6 +57,14 @@ func (r *GORMCourseRepository) FindByOrg(ctx context.Context, orgID uuid.UUID, p
 }
 
 func (r *GORMCourseRepository) FindByIDs(ctx context.Context, ids []uuid.UUID, orgID uuid.UUID, page, pageSize int) ([]entities.Course, int64, error) {
+	return r.findByIDs(ctx, ids, orgID, page, pageSize, "")
+}
+
+func (r *GORMCourseRepository) FindPublishedByIDs(ctx context.Context, ids []uuid.UUID, orgID uuid.UUID, page, pageSize int) ([]entities.Course, int64, error) {
+	return r.findByIDs(ctx, ids, orgID, page, pageSize, entities.StatusPublished)
+}
+
+func (r *GORMCourseRepository) findByIDs(ctx context.Context, ids []uuid.UUID, orgID uuid.UUID, page, pageSize int, status entities.CourseStatus) ([]entities.Course, int64, error) {
 	if len(ids) == 0 {
 		return []entities.Course{}, 0, nil
 	}
@@ -64,16 +72,25 @@ func (r *GORMCourseRepository) FindByIDs(ctx context.Context, ids []uuid.UUID, o
 	for i, id := range ids {
 		strIDs[i] = id.String()
 	}
+	baseQuery := r.db.WithContext(ctx).Model(&database.CourseModel{}).
+		Where("id IN ? AND org_id = ?", strIDs, orgID.String())
+	if status != "" {
+		baseQuery = baseQuery.Where("status = ?", string(status))
+	}
+
 	var models []database.CourseModel
 	var count int64
-	err := r.db.WithContext(ctx).Model(&database.CourseModel{}).
-		Where("id IN ? AND org_id = ?", strIDs, orgID.String()).Count(&count).Error
+	err := baseQuery.Count(&count).Error
 	if err != nil {
 		return nil, 0, apperrors.InternalError(err.Error())
 	}
-	err = r.db.WithContext(ctx).
-		Where("id IN ? AND org_id = ?", strIDs, orgID.String()).
-		Offset((page-1)*pageSize).Limit(pageSize).
+	query := r.db.WithContext(ctx).
+		Where("id IN ? AND org_id = ?", strIDs, orgID.String())
+	if status != "" {
+		query = query.Where("status = ?", string(status))
+	}
+	err = query.
+		Offset((page - 1) * pageSize).Limit(pageSize).
 		Order("created_at DESC").Find(&models).Error
 	if err != nil {
 		return nil, 0, apperrors.InternalError(err.Error())

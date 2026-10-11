@@ -29,6 +29,7 @@ export function AssignmentItem({ assignment, moduleId, courseId, onDelete, onUpd
   const [editOpen, setEditOpen] = useState(false)
   const [editTitle, setEditTitle] = useState(assignment.title)
   const [editDescription, setEditDescription] = useState(assignment.description ?? '')
+  const [editRubric, setEditRubric] = useState(assignment.rubric ?? '')
   const [editMaxPoints, setEditMaxPoints] = useState(assignment.max_points)
   const [editDueDate, setEditDueDate] = useState(
     assignment.due_date ? new Date(assignment.due_date).toISOString().slice(0, 16) : ''
@@ -67,6 +68,7 @@ export function AssignmentItem({ assignment, moduleId, courseId, onDelete, onUpd
   const handleEdit = () => {
     setEditTitle(assignment.title)
     setEditDescription(assignment.description ?? '')
+    setEditRubric(assignment.rubric ?? '')
     setEditMaxPoints(assignment.max_points)
     setEditDueDate(
       assignment.due_date ? new Date(assignment.due_date).toISOString().slice(0, 16) : ''
@@ -83,6 +85,7 @@ export function AssignmentItem({ assignment, moduleId, courseId, onDelete, onUpd
         input: {
           title: editTitle,
           description: editDescription,
+          rubric: editRubric,
           max_points: editMaxPoints,
           due_date: editDueDate ? new Date(editDueDate).toISOString() : undefined,
           allow_late_submission: editAllowLate,
@@ -215,6 +218,16 @@ export function AssignmentItem({ assignment, moduleId, courseId, onDelete, onUpd
                 rows={5}
                 placeholder="Assignment instructions…"
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Rubric / assessment criteria</Label>
+              <Textarea
+                value={editRubric}
+                onChange={(e) => setEditRubric(e.target.value)}
+                rows={4}
+                placeholder="For example: research quality — 40 points; argumentation — 35 points; clarity and references — 25 points."
+              />
+              <p className="text-xs text-ink-muted">Students see these criteria before submitting; graders can use them while giving feedback.</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">

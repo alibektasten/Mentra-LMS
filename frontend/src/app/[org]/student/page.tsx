@@ -60,7 +60,7 @@ export default function StudentDashboard() {
       </div>
 
       {/* Main content: two-column */}
-      <div className="grid grid-cols-[1fr_280px] gap-8">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-8">
         {/* Left column — primary content */}
         <div className="space-y-8">
           <RecentCourses courses={courses} isLoading={coursesLoading} />

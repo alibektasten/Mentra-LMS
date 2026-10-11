@@ -27,17 +27,32 @@ func NewCourseUseCase(
 }
 
 func (uc *CourseUseCase) CreateCourse(ctx context.Context, req dto.CreateCourseRequest, creatorID, orgID uuid.UUID) (*dto.CourseDTO, error) {
+	status := entities.StatusDraft
+	if req.Status == string(entities.StatusPublished) {
+		status = entities.StatusPublished
+	}
 	course := &entities.Course{
 		ID:          uuid.New(),
 		OrgID:       orgID,
 		Title:       req.Title,
 		Description: req.Description,
-		Status:      entities.StatusDraft,
+		Status:      status,
 		CreatedBy:   creatorID,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
 	if err := uc.courseRepo.Create(ctx, course); err != nil {
+		return nil, err
+	}
+	// A teacher must immediately see and be able to manage the course they
+	// create. Admin-created courses also keep their creator as a collaborator.
+	if err := uc.ctRepo.Add(ctx, &entities.CourseTeacher{
+		ID:         uuid.New(),
+		CourseID:   course.ID,
+		TeacherID:  creatorID,
+		OrgID:      orgID,
+		AssignedAt: time.Now(),
+	}); err != nil {
 		return nil, err
 	}
 	return toCourseDTO(course), nil
@@ -86,7 +101,7 @@ func (uc *CourseUseCase) ListCoursesForRole(ctx context.Context, userID, orgID u
 		if err != nil {
 			return nil, 0, err
 		}
-		courses, total, err := uc.courseRepo.FindByIDs(ctx, ids, orgID, page, pageSize)
+		courses, total, err := uc.courseRepo.FindPublishedByIDs(ctx, ids, orgID, page, pageSize)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -110,6 +125,9 @@ func (uc *CourseUseCase) UpdateCourse(ctx context.Context, id, orgID uuid.UUID, 
 	}
 	if req.Description != "" {
 		course.Description = req.Description
+	}
+	if req.Status == string(entities.StatusDraft) || req.Status == string(entities.StatusPublished) || req.Status == string(entities.StatusArchived) {
+		course.Status = entities.CourseStatus(req.Status)
 	}
 	course.UpdatedAt = time.Now()
 	if err := uc.courseRepo.Update(ctx, course); err != nil {

@@ -109,6 +109,12 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
             <p className="text-sm leading-relaxed whitespace-pre-wrap text-[#1a1a1a]">{assignment.description}</p>
           </div>
         )}
+        {assignment.rubric && (
+          <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-900 dark:bg-sky-950/30">
+            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">Assessment criteria</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-sky-950 dark:text-sky-100">{assignment.rubric}</p>
+          </div>
+        )}
         {attachments.length > 0 && (
           <div className="mt-3 space-y-1.5">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-[#9b9b9b] uppercase tracking-wide">

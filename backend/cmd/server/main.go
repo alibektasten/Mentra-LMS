@@ -74,6 +74,8 @@ func main() {
 	examAttemptRepo := infraRepos.NewGORMExamAttemptRepository(db)
 	extraAttemptGrantRepo := infraRepos.NewGORMExtraAttemptGrantRepository(db)
 	courseTeacherRepo := infraRepos.NewGORMCourseTeacherRepository(db)
+	flashcardDeckRepo := infraRepos.NewGORMFlashcardDeckRepository(db)
+	certificateRepo := infraRepos.NewGORMCertificateRepository(db)
 
 	// Init storage
 	uploadDir := os.Getenv("UPLOAD_DIR")
@@ -82,9 +84,16 @@ func main() {
 	}
 	localStore := storage.NewLocalStorage(uploadDir)
 
-	// Init AI service
-	aiService := infraAI.NewOllamaClient(cfg.Ollama)
-	go aiService.Warmup(context.Background())
+	// Init AI service. The provider is selected server-side so API keys never
+	// reach the browser.
+	aiService, err := infraAI.NewService(cfg.AI, cfg.Ollama, cfg.OpenAI)
+	if err != nil {
+		log.Error("failed to initialize AI service", "error", err)
+		os.Exit(1)
+	}
+	if warmup, ok := aiService.(interface{ Warmup(context.Context) }); ok {
+		go warmup.Warmup(context.Background())
+	}
 
 	seedSuperAdmin(context.Background(), userRepo, cfg, log)
 
@@ -106,29 +115,37 @@ func main() {
 	announcementUC := usecases.NewAnnouncementUseCase(announcementRepo, courseRepo)
 	groupUC := usecases.NewGroupUseCase(groupRepo, courseRepo)
 	examUC := usecases.NewExamUseCase(examRepo, examAttemptRepo, extraAttemptGrantRepo, courseRepo)
+	teacherUC := usecases.NewTeacherUseCase(courseRepo, groupRepo, courseTeacherRepo, userRepo, assignmentRepo)
+	flashcardDeckUC := usecases.NewFlashcardDeckUseCase(flashcardDeckRepo, lessonRepo)
+	certificateUC := usecases.NewCertificateUseCase(certificateRepo, groupRepo, courseRepo, moduleRepo, lessonRepo, progressRepo)
+	notificationUC := usecases.NewNotificationUseCase(announcementRepo, courseRepo, groupRepo, courseTeacherRepo)
 
 	fileAttachmentUC := usecases.NewFileAttachmentUseCase(fileAttachmentRepo)
 
 	// Init handlers
-	authHandler := handlers.NewAuthHandler(authUC)
+	authHandler := handlers.NewAuthHandler(authUC, cfg.GoogleOAuth, cfg.JWT.Secret)
 	courseHandler := handlers.NewCourseHandler(courseUC)
 	courseTeacherHandler := handlers.NewCourseTeacherHandler(courseTeacherUC)
 	memberHandler := handlers.NewMemberHandler(memberUC)
 	moduleHandler := handlers.NewModuleHandler(moduleUC)
 	lessonHandler := handlers.NewLessonHandler(lessonUC)
-	aiHandler := handlers.NewAIHandler(aiUC)
+	aiHandler := handlers.NewAIHandler(aiUC, courseTeacherRepo, groupRepo, courseRepo, lessonRepo, moduleRepo)
 	progressHandler := handlers.NewProgressHandler(progressUC)
 	userHandler := handlers.NewUserHandler(userUC)
 	superAdminHandler := handlers.NewSuperAdminHandler(superAdminUC, authUC)
 	assignmentHandler := handlers.NewAssignmentHandler(assignmentUC, localStore)
 	quizAttemptHandler := handlers.NewQuizAttemptHandler(quizAttemptUC)
 	quizHandler := handlers.NewQuizHandler(quizUC)
-	fileAttachmentHandler := handlers.NewFileAttachmentHandler(fileAttachmentUC)
+	fileAttachmentHandler := handlers.NewFileAttachmentHandler(fileAttachmentUC, courseTeacherRepo, groupRepo, courseRepo, lessonRepo, moduleRepo, assignmentRepo)
 	gradeHandler := handlers.NewGradeHandler(gradeUC)
 	uploadHandler := handlers.NewUploadHandler(localStore)
 	announcementHandler := handlers.NewAnnouncementHandler(announcementUC)
 	groupHandler := handlers.NewGroupHandler(groupUC)
 	examHandler := handlers.NewExamHandler(examUC, localStore)
+	teacherHandler := handlers.NewTeacherHandler(teacherUC)
+	flashcardDeckHandler := handlers.NewFlashcardDeckHandler(flashcardDeckUC)
+	certificateHandler := handlers.NewCertificateHandler(certificateUC)
+	notificationHandler := handlers.NewNotificationHandler(notificationUC)
 
 	gin.SetMode(cfg.Server.Mode)
 	router := routes.NewRouter(routes.Dependencies{
@@ -151,8 +168,22 @@ func main() {
 		AnnouncementHandler:   announcementHandler,
 		GroupHandler:          groupHandler,
 		ExamHandler:           examHandler,
+		TeacherHandler:        teacherHandler,
+		FlashcardDeckHandler:  flashcardDeckHandler,
+		CertificateHandler:    certificateHandler,
+		NotificationHandler:   notificationHandler,
 		OrgRepo:               orgRepo,
+		CourseRepo:            courseRepo,
+		CourseTeacherRepo:     courseTeacherRepo,
+		GroupRepo:             groupRepo,
+		ModuleRepo:            moduleRepo,
+		LessonRepo:            lessonRepo,
+		AssignmentRepo:        assignmentRepo,
+		QuizRepo:              quizRepo,
+		ExamRepo:              examRepo,
+		ExamAttemptRepo:       examAttemptRepo,
 		JWTSecret:             cfg.JWT.Secret,
+		AIRequestLimit:        cfg.AI.DailyRequestLimit,
 		Logger:                log,
 		UploadDir:             uploadDir,
 	})

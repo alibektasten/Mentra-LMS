@@ -1,0 +1,75 @@
+# Temporary, IP-address-friendly demo deployment.
+#
+# Start it with:
+# docker compose --env-file .env.demo -f docker-compose.demo.yml up -d --build
+#
+# It intentionally uses OpenAI and does not start Ollama, so the VPS does not
+# need to download or run a local language model.
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx/demo.nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/uploads:/data/uploads:ro
+    depends_on:
+      - app
+      - frontend
+    restart: unless-stopped
+
+  app:
+    build: ./backend
+    environment:
+      SERVER_PORT: '8080'
+      SERVER_MODE: release
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN in .env.demo}
+      DB_DSN: postgres://lms:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.demo}@postgres:5432/lms?sslmode=disable
+      DB_MAX_OPEN_CONNS: '25'
+      DB_MAX_IDLE_CONNS: '10'
+      DB_CONN_MAX_LIFETIME_MINUTES: '30'
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.demo}
+      JWT_ACCESS_TOKEN_TTL_MINUTES: '15'
+      AI_PROVIDER: openai
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in .env.demo}
+      OPENAI_BASE_URL: https://api.openai.com/v1
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.4-mini}
+      OPENAI_TIMEOUT_SECONDS: '90'
+      OPENAI_MAX_OUTPUT_TOKENS: '1200'
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:?Set SUPER_ADMIN_EMAIL in .env.demo}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?Set SUPER_ADMIN_PASSWORD in .env.demo}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - ./data/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # The browser calls the API through the same Nginx host. This works
+        # with either a VPS IP address or a domain, without rebuilding later.
+        NEXT_PUBLIC_API_URL: /api/v1
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: lms
+      POSTGRES_USER: lms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.demo}
+    volumes:
+      - demo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lms -d lms']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  demo_pgdata:

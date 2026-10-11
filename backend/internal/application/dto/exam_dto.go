@@ -90,11 +90,16 @@ type ExamListItemDTO struct {
 }
 
 type StartAttemptResponse struct {
-	AttemptID string    `json:"attempt_id"`
-	ExamID    string    `json:"exam_id"`
-	StartedAt time.Time `json:"started_at"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Exam      *ExamDTO  `json:"exam"`
+	AttemptID    string               `json:"attempt_id"`
+	ExamID       string               `json:"exam_id"`
+	StartedAt    time.Time            `json:"started_at"`
+	ExpiresAt    time.Time            `json:"expires_at"`
+	SavedAnswers []ExamMCQAnswerInput `json:"saved_answers"`
+	Exam         *ExamDTO             `json:"exam"`
+}
+
+type SaveExamDraftRequest struct {
+	MCQAnswers []ExamMCQAnswerInput `json:"mcq_answers"`
 }
 
 type ExamMCQAnswerInput struct {
@@ -103,26 +108,26 @@ type ExamMCQAnswerInput struct {
 }
 
 type ExamAttemptDTO struct {
-	ID           string                `json:"id"`
-	ExamID       string                `json:"exam_id"`
-	StudentID    string                `json:"student_id"`
-	Status       string                `json:"status"`
-	StartedAt    time.Time             `json:"started_at"`
-	ExpiresAt    time.Time             `json:"expires_at"`
-	SubmittedAt  *time.Time            `json:"submitted_at"`
-	MCQAnswers   []ExamMCQAnswerInput  `json:"mcq_answers"`
-	MCQScore     *int                  `json:"mcq_score"`
-	MCQMaxScore  int                   `json:"mcq_max_score"`
-	FilePath     string                `json:"file_path"`
-	FileScore    *int                  `json:"file_score"`
-	FilePoints   int                   `json:"file_points"`
-	FileFeedback string                `json:"file_feedback"`
-	TotalScore   *int                  `json:"total_score"`
-	GradedAt     *time.Time            `json:"graded_at"`
+	ID           string               `json:"id"`
+	ExamID       string               `json:"exam_id"`
+	StudentID    string               `json:"student_id"`
+	Status       string               `json:"status"`
+	StartedAt    time.Time            `json:"started_at"`
+	ExpiresAt    time.Time            `json:"expires_at"`
+	SubmittedAt  *time.Time           `json:"submitted_at"`
+	MCQAnswers   []ExamMCQAnswerInput `json:"mcq_answers"`
+	MCQScore     *int                 `json:"mcq_score"`
+	MCQMaxScore  int                  `json:"mcq_max_score"`
+	FilePath     string               `json:"file_path"`
+	FileScore    *int                 `json:"file_score"`
+	FilePoints   int                  `json:"file_points"`
+	FileFeedback string               `json:"file_feedback"`
+	TotalScore   *int                 `json:"total_score"`
+	GradedAt     *time.Time           `json:"graded_at"`
 }
 
 type GradeExamFileRequest struct {
-	Score    int    `json:"score" binding:"required"`
+	Score    int    `json:"score" binding:"gte=0"`
 	Feedback string `json:"feedback"`
 }
 

@@ -1,0 +1,117 @@
+# Production deployment for a real domain. Caddy obtains and renews TLS
+# certificates automatically; do not use an IP address in DOMAIN.
+#
+# Start:
+#   docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env.production}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env.production}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/uploads:/srv/uploads:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  app:
+    build: ./backend
+    environment:
+      SERVER_PORT: '8080'
+      SERVER_MODE: release
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN:?Set DOMAIN in .env.production}
+      DB_DSN: postgres://lms:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}@postgres:5432/lms?sslmode=disable
+      DB_MAX_OPEN_CONNS: '25'
+      DB_MAX_IDLE_CONNS: '10'
+      DB_CONN_MAX_LIFETIME_MINUTES: '30'
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.production}
+      JWT_ACCESS_TOKEN_TTL_MINUTES: '15'
+      AI_PROVIDER: openai
+      AI_DAILY_REQUEST_LIMIT: ${AI_DAILY_REQUEST_LIMIT:-50}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in .env.production}
+      OPENAI_BASE_URL: https://api.openai.com/v1
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.4-mini}
+      OPENAI_TIMEOUT_SECONDS: '90'
+      OPENAI_MAX_OUTPUT_TOKENS: '1200'
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URL: https://${DOMAIN:?Set DOMAIN in .env.production}/api/v1/auth/google/callback
+      FRONTEND_URL: https://${DOMAIN:?Set DOMAIN in .env.production}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:?Set SUPER_ADMIN_EMAIL in .env.production}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?Set SUPER_ADMIN_PASSWORD in .env.production}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - ./data/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O - http://localhost:8080/health >/dev/null 2>&1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: /api/v1
+    environment:
+      NODE_ENV: production
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O - http://localhost:3000/ >/dev/null 2>&1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: lms
+      POSTGRES_USER: lms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - production_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lms -d lms']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  backup:
+    build: ./docker/backup
+    environment:
+      PGHOST: postgres
+      PGPORT: '5432'
+      PGDATABASE: lms
+      PGUSER: lms
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - ./data/backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  production_pgdata:
+  caddy_data:
+  caddy_config:

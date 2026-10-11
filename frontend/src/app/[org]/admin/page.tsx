@@ -6,6 +6,7 @@ import { useMembers } from '@/lib/queries/members.queries'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useI18n } from '@/lib/i18n'
 
 function StatCard({ title, value, icon: Icon, description }: {
   title: string; value: string | number; icon: React.ElementType; description?: string
@@ -25,6 +26,7 @@ function StatCard({ title, value, icon: Icon, description }: {
 }
 
 export default function AdminDashboard() {
+  const { t } = useI18n()
   const { data: courses, isLoading } = useCourses({ page: 1, page_size: 100 })
   const { data: members } = useMembers({ page: 1, page_size: 1, role: 'student' })
 
@@ -34,22 +36,22 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Dashboard" description="Overview of your organization" />
+      <PageHeader title={t('dashboard')} description={t('organizationOverview')} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)
         ) : (
           <>
-            <StatCard title="Total Courses" value={totalCourses} icon={BookOpen} />
-            <StatCard title="Published" value={publishedCourses} icon={TrendingUp} description="Active courses" />
-            <StatCard title="Students" value={totalStudents} icon={Users} description="Enrolled members" />
-            <StatCard title="AI Insights" value="Ready" icon={Sparkles} description="Generate reports" />
+            <StatCard title={t('totalCourses')} value={totalCourses} icon={BookOpen} />
+            <StatCard title={t('published')} value={publishedCourses} icon={TrendingUp} description={t('activeCoursesDescription')} />
+            <StatCard title={t('students')} value={totalStudents} icon={Users} description={t('enrolledMembers')} />
+            <StatCard title={t('aiInsights')} value={t('ready')} icon={Sparkles} description={t('generateReports')} />
           </>
         )}
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Recent Courses</CardTitle>
+          <CardTitle>{t('courses')}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -67,7 +69,7 @@ export default function AdminDashboard() {
                 </div>
               ))}
               {(courses?.data ?? []).length === 0 && (
-                <p className="text-sm text-ink-muted">No courses yet</p>
+                <p className="text-sm text-ink-muted">{t('noCoursesYet')}</p>
               )}
             </div>
           )}

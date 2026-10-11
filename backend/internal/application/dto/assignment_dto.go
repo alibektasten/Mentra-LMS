@@ -5,6 +5,7 @@ import "time"
 type CreateAssignmentRequest struct {
 	Title               string     `json:"title" binding:"required"`
 	Description         string     `json:"description"`
+	Rubric              string     `json:"rubric"`
 	MaxPoints           int        `json:"max_points" binding:"required,min=1"`
 	DueDate             *time.Time `json:"due_date"`
 	AllowLateSubmission bool       `json:"allow_late_submission"`
@@ -13,6 +14,7 @@ type CreateAssignmentRequest struct {
 type UpdateAssignmentRequest struct {
 	Title               *string    `json:"title"`
 	Description         *string    `json:"description"`
+	Rubric              *string    `json:"rubric"`
 	MaxPoints           *int       `json:"max_points"`
 	DueDate             *time.Time `json:"due_date"`
 	AllowLateSubmission *bool      `json:"allow_late_submission"`
@@ -24,6 +26,7 @@ type AssignmentDTO struct {
 	ModuleID            string     `json:"module_id"`
 	Title               string     `json:"title"`
 	Description         string     `json:"description"`
+	Rubric              string     `json:"rubric"`
 	MaxPoints           int        `json:"max_points"`
 	DueDate             *time.Time `json:"due_date"`
 	AllowLateSubmission bool       `json:"allow_late_submission"`
@@ -33,7 +36,7 @@ type AssignmentDTO struct {
 }
 
 type GradeSubmissionRequest struct {
-	Score    int    `json:"score" binding:"min=0"`
+	Score    int    `json:"score" binding:"gte=0"`
 	Feedback string `json:"feedback"`
 }
 

@@ -25,6 +25,7 @@ func (r *GORMUserRepository) Create(ctx context.Context, user *entities.User) er
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
 		Name:         user.Name,
+		AvatarURL:    user.AvatarURL,
 		Role:         user.Role,
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
@@ -63,6 +64,7 @@ func (r *GORMUserRepository) Update(ctx context.Context, user *entities.User) er
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
 		Name:         user.Name,
+		AvatarURL:    user.AvatarURL,
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 	}).Error
@@ -74,7 +76,7 @@ func (r *GORMUserRepository) ListAll(ctx context.Context, page, pageSize int) ([
 	if err := r.db.WithContext(ctx).Model(&database.UserModel{}).Count(&count).Error; err != nil {
 		return nil, 0, apperrors.InternalError(err.Error())
 	}
-	if err := r.db.WithContext(ctx).Offset((page-1)*pageSize).Limit(pageSize).Find(&models).Error; err != nil {
+	if err := r.db.WithContext(ctx).Offset((page - 1) * pageSize).Limit(pageSize).Find(&models).Error; err != nil {
 		return nil, 0, apperrors.InternalError(err.Error())
 	}
 	result := make([]entities.User, len(models))
@@ -110,6 +112,7 @@ func toUserEntity(m *database.UserModel) *entities.User {
 		Email:        m.Email,
 		PasswordHash: m.PasswordHash,
 		Name:         m.Name,
+		AvatarURL:    m.AvatarURL,
 		Role:         m.Role,
 		CreatedAt:    m.CreatedAt,
 		UpdatedAt:    m.UpdatedAt,

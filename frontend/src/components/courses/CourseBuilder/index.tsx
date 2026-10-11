@@ -16,6 +16,7 @@ import * as lessonsApi from '@/lib/api/lessons'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ModuleList } from './ModuleList'
+import { useI18n } from '@/lib/i18n'
 
 export interface BuilderLesson extends LessonDTO {
   _dirty?: boolean
@@ -32,6 +33,7 @@ interface CourseBuilderProps {
 }
 
 export function CourseBuilder({ courseId }: CourseBuilderProps) {
+  const { t } = useI18n()
   const { data: modulesData, isLoading } = useModules(courseId)
   const createModule = useCreateModule(courseId)
   const [modules, setModules] = useState<BuilderModule[]>([])
@@ -110,9 +112,9 @@ export function CourseBuilder({ courseId }: CourseBuilderProps) {
       }
       setModules((prev) => prev.map((m) => ({ ...m, _dirty: false, lessons: m.lessons.map((l) => ({ ...l, _dirty: false })) })))
       setIsDirty(false)
-      toast.success('Changes saved')
+      toast.success(t('changesSaved'))
     } catch {
-      toast.error('Failed to save some changes')
+      toast.error(t('failedToSaveChanges'))
     } finally {
       setIsSaving(false)
     }
@@ -125,16 +127,16 @@ export function CourseBuilder({ courseId }: CourseBuilderProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-ink">Course Content</h3>
+        <h3 className="text-sm font-semibold text-ink">{t('courseContent')}</h3>
         <div className="flex gap-2">
           {isDirty && (
             <Button size="sm" onClick={handleSave} disabled={isSaving}>
               <Save className="h-4 w-4 mr-2" />
-              {isSaving ? 'Saving...' : 'Save Changes'}
+              {isSaving ? t('saving') : t('saveChanges')}
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={handleAddModule}>
-            <Plus className="h-4 w-4 mr-2" /> Add Module
+            <Plus className="h-4 w-4 mr-2" /> {t('addModule')}
           </Button>
         </div>
       </div>

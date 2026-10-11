@@ -48,7 +48,7 @@ export function AssignmentFeedbackPanel({ submissionId, hasTextContent }: Assign
       setExpanded(true)
       toast.success('AI feedback generated')
     } catch {
-      toast.error('Failed to generate feedback. Make sure Ollama is running.')
+      toast.error('Failed to generate feedback. Please try again later.')
     }
   }
 

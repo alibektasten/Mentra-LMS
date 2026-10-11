@@ -2,7 +2,7 @@ import axios, { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/lib/stores/auth.store'
 import { useReAuthStore } from '@/lib/stores/reauth.store'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1'
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080/api/v1'
 
 // Base host for static file serving (strips /api/v1 suffix)
 export const UPLOAD_BASE_URL = API_URL.replace(/\/api\/v\d+$/, '')

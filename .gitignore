@@ -9,6 +9,8 @@ AGENTS.md
 
 # Environment files
 .env
+.env.demo
+.env.production
 .env.local
 .env.*.local
 !.env.example
@@ -23,6 +25,9 @@ frontend/node_modules/
 frontend/.next/
 frontend/out/
 frontend/.turbo/
+frontend/playwright-report/
+frontend/test-results/
+frontend/*.tsbuildinfo
 npm-debug.log*
 yarn-error.log*
 

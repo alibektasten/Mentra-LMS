@@ -27,6 +27,7 @@ type ollamaRequest struct {
 	Prompt    string `json:"prompt"`
 	Stream    bool   `json:"stream"`
 	KeepAlive string `json:"keep_alive,omitempty"`
+	Think     *bool  `json:"think,omitempty"`
 }
 
 // extractJSON strips markdown code fences that LLMs sometimes wrap around JSON,
@@ -80,6 +81,12 @@ func (c *OllamaClient) generate(ctx context.Context, prompt string) (string, err
 		Prompt:    prompt,
 		Stream:    false,
 		KeepAlive: "1h",
+	}
+	// Qwen 3 enables a long reasoning phase by default. Disabling it for these
+	// short, structured LMS actions keeps the local fallback responsive.
+	if strings.HasPrefix(strings.ToLower(c.model), "qwen3") {
+		think := false
+		reqBody.Think = &think
 	}
 	data, err := json.Marshal(reqBody)
 	if err != nil {

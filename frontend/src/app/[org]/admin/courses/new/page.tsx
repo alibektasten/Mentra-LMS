@@ -52,7 +52,7 @@ export default function NewCoursePage() {
             </div>
             <div className="space-y-1.5">
               <Label>Status</Label>
-              <Select value={watch('status')} onValueChange={(v) => setValue('status', v as 'draft' | 'published')}>
+              <Select value={watch('status')} onValueChange={(v) => setValue('status', v as 'draft' | 'published' | 'archived')}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

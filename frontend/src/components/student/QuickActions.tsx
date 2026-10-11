@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Play, Sparkles, TrendingUp, Award, ArrowRight } from 'lucide-react'
 import { ProgressDTO } from '@/types/progress'
+import { useI18n } from '@/lib/i18n'
 
 interface QuickActionsProps {
   lastProgress?: ProgressDTO
@@ -11,33 +12,34 @@ interface QuickActionsProps {
 
 export function QuickActions({ lastProgress }: QuickActionsProps) {
   const { org } = useParams<{ org: string }>()
+  const { t } = useI18n()
 
   const actions = [
     {
       icon: Play,
-      label: lastProgress ? 'Resume Learning' : 'Start Learning',
+      label: lastProgress ? t('resumeLearning') : t('startLearning'),
       href: `/${org}/student/courses`,
     },
     {
       icon: Sparkles,
-      label: 'Generate a Quiz',
+      label: t('quizGenerator'),
       href: `/${org}/student/ai`,
     },
     {
       icon: TrendingUp,
-      label: 'View Progress',
+      label: t('viewProgress'),
       href: `/${org}/student/progress`,
     },
     {
       icon: Award,
-      label: 'Certificates',
+      label: t('certificates'),
       href: `/${org}/student/certificates`,
     },
   ]
 
   return (
     <div className="flex flex-col">
-      <p className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-widest mb-3">Quick Actions</p>
+      <p className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-widest mb-3">{t('quickActions')}</p>
       <div className="divide-y divide-[#e8e8e6] border border-[#e8e8e6] rounded-lg overflow-hidden">
         {actions.map(({ icon: Icon, label, href }) => (
           <Link

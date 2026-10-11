@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/ailms/backend/internal/application/dto"
@@ -123,6 +124,7 @@ func (h *ExamHandler) StartAttempt(c *gin.Context) {
 }
 
 func (h *ExamHandler) SubmitAttempt(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, storage.MaxUploadBytes+1024*1024)
 	attemptID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.Error(apperrors.ValidationError("invalid attempt id"))
@@ -148,6 +150,10 @@ func (h *ExamHandler) SubmitAttempt(c *gin.Context) {
 		defer file.Close()
 		filePath, err = h.storage.Save(file, header, orgID.String())
 		if err != nil {
+			if errors.Is(err, storage.ErrInvalidUpload) {
+				c.Error(apperrors.ValidationError(err.Error()))
+				return
+			}
 			c.Error(apperrors.InternalError("failed to save file: " + err.Error()))
 			return
 		}
@@ -159,6 +165,25 @@ func (h *ExamHandler) SubmitAttempt(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": result})
+}
+
+func (h *ExamHandler) SaveDraft(c *gin.Context) {
+	attemptID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.Error(apperrors.ValidationError("invalid attempt id"))
+		return
+	}
+	var req dto.SaveExamDraftRequest
+	if err := bindJSON(c, &req); err != nil {
+		c.Error(err)
+		return
+	}
+	studentID, _ := uuid.Parse(middleware.GetUserID(c))
+	if err := h.examUC.SaveDraft(c.Request.Context(), attemptID, studentID, req.MCQAnswers); err != nil {
+		c.Error(err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h *ExamHandler) MyAttempts(c *gin.Context) {

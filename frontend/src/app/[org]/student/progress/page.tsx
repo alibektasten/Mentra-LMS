@@ -5,8 +5,10 @@ import { useProgress } from '@/lib/queries/progress.queries'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate } from '@/lib/utils/format'
+import { useI18n } from '@/lib/i18n'
 
 export default function StudentProgressPage() {
+  const { t } = useI18n()
   const { data: progress = [], isLoading } = useProgress()
 
   const completed = progress.filter((p) => !!p.completed_at)
@@ -19,10 +21,10 @@ export default function StudentProgressPage() {
     : null
 
   const stats = [
-    { label: 'Lessons completed', value: completed.length },
-    { label: 'Average score', value: avgScore != null ? `${avgScore}%` : '—' },
-    { label: 'Total activity', value: progress.length },
-    { label: 'Completion rate', value: completionRate != null ? `${completionRate}%` : '—' },
+    { label: t('lessonsCompleted'), value: completed.length },
+    { label: t('averageScore'), value: avgScore != null ? `${avgScore}%` : '—' },
+    { label: t('totalActivity'), value: progress.length },
+    { label: t('completionRate'), value: completionRate != null ? `${completionRate}%` : '—' },
   ]
 
   const recent = [...progress]
@@ -33,8 +35,8 @@ export default function StudentProgressPage() {
     <div className="max-w-3xl">
       {/* Page header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-[#1a1a1a]">Progress</h1>
-        <p className="mt-1 text-sm text-[#9b9b9b]">Your learning activity, scores, and completion.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-[#1a1a1a]">{t('progress')}</h1>
+        <p className="mt-1 text-sm text-[#9b9b9b]">{t('learningProgressDescription')}</p>
       </div>
 
       {/* Stats */}
@@ -49,7 +51,7 @@ export default function StudentProgressPage() {
 
       {/* Activity */}
       <div>
-        <p className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-widest mb-3">Activity</p>
+        <p className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-widest mb-3">{t('activity')}</p>
 
         {isLoading ? (
           <div className="space-y-1">
@@ -68,7 +70,7 @@ export default function StudentProgressPage() {
                   : <Circle className="h-3.5 w-3.5 shrink-0 text-[#c9c9c9]" />
                 }
                 <span className="flex-1 text-sm text-[#3b3b3b]">
-                  {p.completed_at ? 'Completed' : 'Started'} a lesson
+                  {p.completed_at ? t('completedLesson') : t('startedLesson')}
                 </span>
                 {p.score != null && (
                   <div className="flex items-center gap-2 shrink-0">

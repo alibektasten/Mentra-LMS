@@ -4,12 +4,14 @@ import { useUpcomingDeadlines } from '@/lib/queries/grades.queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils/cn'
 import { CheckCircle2, Clock } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 interface UpcomingDeadlinesProps {
   courseId: string
 }
 
 export function UpcomingDeadlines({ courseId }: UpcomingDeadlinesProps) {
+  const { t } = useI18n()
   const { data, isLoading } = useUpcomingDeadlines(courseId)
 
   if (isLoading) {
@@ -17,7 +19,7 @@ export function UpcomingDeadlines({ courseId }: UpcomingDeadlinesProps) {
   }
 
   if (!data || data.length === 0) {
-    return <p className="text-sm text-ink-muted py-4">No upcoming deadlines.</p>
+    return <p className="text-sm text-ink-muted py-4">{t('noUpcomingDeadlines')}</p>
   }
 
   const sorted = [...data].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
@@ -44,10 +46,10 @@ export function UpcomingDeadlines({ courseId }: UpcomingDeadlinesProps) {
               {item.item_type}
             </span>
             {item.submitted ? (
-              <span className="text-xs text-green-600">Submitted</span>
+              <span className="text-xs text-green-600">{t('submitted')}</span>
             ) : (
               <span className={cn('text-xs px-2 py-0.5 rounded border', urgency)}>
-                {daysLeft <= 0 ? 'Due today' : `${daysLeft}d left`}
+                {daysLeft <= 0 ? t('dueToday') : `${daysLeft} ${t('daysLeft')}`}
               </span>
             )}
           </div>

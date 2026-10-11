@@ -6,6 +6,7 @@ import (
 	"github.com/ailms/backend/internal/application/dto"
 	"github.com/ailms/backend/internal/application/usecases"
 	"github.com/ailms/backend/internal/delivery/http/middleware"
+	"github.com/ailms/backend/internal/domain/entities"
 	apperrors "github.com/ailms/backend/pkg/errors"
 	"github.com/ailms/backend/pkg/utils"
 	"github.com/gin-gonic/gin"
@@ -48,6 +49,10 @@ func (h *CourseHandler) Create(c *gin.Context) {
 	}
 	userID, _ := uuid.Parse(middleware.GetUserID(c))
 	orgID, _ := uuid.Parse(middleware.GetOrgID(c))
+	if req.Status == string(entities.StatusPublished) && middleware.GetRole(c) != string(entities.RoleAdmin) {
+		c.Error(apperrors.ForbiddenError("only administrators can publish courses"))
+		return
+	}
 	course, err := h.courseUC.CreateCourse(c.Request.Context(), req, userID, orgID)
 	if err != nil {
 		c.Error(err)
@@ -83,6 +88,10 @@ func (h *CourseHandler) Update(c *gin.Context) {
 		return
 	}
 	orgID, _ := uuid.Parse(middleware.GetOrgID(c))
+	if req.Status == string(entities.StatusPublished) && middleware.GetRole(c) != string(entities.RoleAdmin) {
+		c.Error(apperrors.ForbiddenError("only administrators can publish courses"))
+		return
+	}
 	course, err := h.courseUC.UpdateCourse(c.Request.Context(), id, orgID, req)
 	if err != nil {
 		c.Error(err)

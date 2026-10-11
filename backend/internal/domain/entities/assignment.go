@@ -13,6 +13,7 @@ type Assignment struct {
 	ModuleID            uuid.UUID
 	Title               string
 	Description         string
+	Rubric              string
 	MaxPoints           int
 	DueDate             *time.Time
 	AllowLateSubmission bool

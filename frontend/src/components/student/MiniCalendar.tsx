@@ -4,20 +4,22 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { ProgressDTO } from '@/types/progress'
 import { cn } from '@/lib/utils/cn'
+import { useI18n } from '@/lib/i18n'
 
 interface MiniCalendarProps {
   progress: ProgressDTO[]
 }
 
-const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
-
 export function MiniCalendar({ progress }: MiniCalendarProps) {
+  const { locale } = useI18n()
+  const languageTag = locale === 'kk' ? 'kk-KZ' : locale === 'ru' ? 'ru-RU' : 'en-US'
+  const days = Array.from({ length: 7 }, (_, index) => new Intl.DateTimeFormat(languageTag, { weekday: 'short' }).format(new Date(2024, 0, index + 1)))
   const today = new Date()
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
 
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
-  const monthLabel = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const monthLabel = viewDate.toLocaleDateString(languageTag, { month: 'long', year: 'numeric' })
 
   const activeDays = new Set(
     progress.map((p) => {
@@ -69,7 +71,7 @@ export function MiniCalendar({ progress }: MiniCalendarProps) {
 
       {/* Day headers */}
       <div className="grid grid-cols-7 mb-1">
-        {DAYS.map((d) => (
+        {days.map((d) => (
           <div key={d} className="text-center text-[10px] font-medium text-[#c9c9c9] py-1">
             {d}
           </div>

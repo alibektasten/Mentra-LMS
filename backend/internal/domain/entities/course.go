@@ -12,6 +12,7 @@ type CourseStatus string
 const (
 	StatusDraft     CourseStatus = "draft"
 	StatusPublished CourseStatus = "published"
+	StatusArchived  CourseStatus = "archived"
 )
 
 type Course struct {

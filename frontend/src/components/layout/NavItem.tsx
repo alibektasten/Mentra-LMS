@@ -18,14 +18,15 @@ export function NavItem({ href, label, icon: Icon }: NavItemProps) {
   return (
     <Link
       href={href}
+      data-active={isActive}
       className={cn(
-        'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+        'group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all duration-200',
         isActive
-          ? 'bg-[#f0efed] text-[#1a1a1a] font-medium'
-          : 'text-[#6b6b6b] hover:bg-[#f0efed] hover:text-[#3b3b3b] font-normal'
+          ? 'bg-[#e9f7f0] text-[#075e46] font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.09)]'
+          : 'text-[#6b6b67] hover:bg-[#f2f1ed] hover:text-[#282824] font-medium'
       )}
     >
-      <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-[#3b3b3b]' : 'text-[#9b9b9b]')} />
+      <Icon className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-[#07855f]' : 'text-[#a09f99] group-hover:text-[#575750]')} />
       {label}
     </Link>
   )

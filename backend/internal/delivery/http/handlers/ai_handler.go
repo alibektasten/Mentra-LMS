@@ -6,17 +6,41 @@ import (
 	"github.com/ailms/backend/internal/application/dto"
 	"github.com/ailms/backend/internal/application/usecases"
 	"github.com/ailms/backend/internal/delivery/http/middleware"
+	"github.com/ailms/backend/internal/domain/repositories"
 	apperrors "github.com/ailms/backend/pkg/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type AIHandler struct {
-	aiUC *usecases.AIUseCase
+	aiUC           *usecases.AIUseCase
+	courseTeachers repositories.CourseTeacherRepository
+	groups         repositories.GroupRepository
+	courses        repositories.CourseRepository
+	lessons        repositories.LessonRepository
+	modules        repositories.ModuleRepository
 }
 
-func NewAIHandler(aiUC *usecases.AIUseCase) *AIHandler {
-	return &AIHandler{aiUC: aiUC}
+func NewAIHandler(
+	aiUC *usecases.AIUseCase,
+	courseTeachers repositories.CourseTeacherRepository,
+	groups repositories.GroupRepository,
+	courses repositories.CourseRepository,
+	lessons repositories.LessonRepository,
+	modules repositories.ModuleRepository,
+) *AIHandler {
+	return &AIHandler{
+		aiUC:           aiUC,
+		courseTeachers: courseTeachers,
+		groups:         groups,
+		courses:        courses,
+		lessons:        lessons,
+		modules:        modules,
+	}
+}
+
+func (h *AIHandler) authorizeLesson(c *gin.Context, lessonID uuid.UUID) bool {
+	return middleware.AuthorizeLessonAccess(c, h.courseTeachers, h.groups, h.courses, h.lessons, h.modules, lessonID)
 }
 
 func (h *AIHandler) SummarizeLesson(c *gin.Context) {
@@ -28,6 +52,9 @@ func (h *AIHandler) SummarizeLesson(c *gin.Context) {
 	lessonID, err := uuid.Parse(req.LessonID)
 	if err != nil {
 		c.Error(apperrors.ValidationError("invalid lesson id"))
+		return
+	}
+	if !h.authorizeLesson(c, lessonID) {
 		return
 	}
 	orgID, _ := uuid.Parse(middleware.GetOrgID(c))
@@ -48,6 +75,9 @@ func (h *AIHandler) GenerateQuiz(c *gin.Context) {
 	lessonID, err := uuid.Parse(req.LessonID)
 	if err != nil {
 		c.Error(apperrors.ValidationError("invalid lesson id"))
+		return
+	}
+	if !h.authorizeLesson(c, lessonID) {
 		return
 	}
 	orgID, _ := uuid.Parse(middleware.GetOrgID(c))
@@ -89,6 +119,9 @@ func (h *AIHandler) GenerateFlashcards(c *gin.Context) {
 	lessonID, err := uuid.Parse(req.LessonID)
 	if err != nil {
 		c.Error(apperrors.ValidationError("invalid lesson id"))
+		return
+	}
+	if !h.authorizeLesson(c, lessonID) {
 		return
 	}
 	orgID, _ := uuid.Parse(middleware.GetOrgID(c))

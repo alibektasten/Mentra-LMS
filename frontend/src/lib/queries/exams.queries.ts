@@ -80,6 +80,13 @@ export function useSubmitExamAttempt(examID: string) {
   })
 }
 
+export function useSaveExamDraft() {
+  return useMutation({
+    mutationFn: ({ attemptID, mcqAnswers }: { attemptID: string; mcqAnswers: import('@/types/exam').ExamMCQAnswerInput[] }) =>
+      examsApi.saveExamDraft(attemptID, mcqAnswers),
+  })
+}
+
 export function useMyAttempts(examID: string) {
   return useQuery({
     queryKey: examKeys.myAttempts(examID),

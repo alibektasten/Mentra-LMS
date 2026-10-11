@@ -4,6 +4,7 @@ import { useMyGrades } from '@/lib/queries/grades.queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils/cn'
 import { CheckCircle2, Clock } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 interface MyGradesProps {
   courseId: string
@@ -18,6 +19,7 @@ function letterGrade(pct: number): string {
 }
 
 export function MyGrades({ courseId }: MyGradesProps) {
+  const { t } = useI18n()
   const { data, isLoading } = useMyGrades(courseId)
 
   if (isLoading) {
@@ -25,7 +27,7 @@ export function MyGrades({ courseId }: MyGradesProps) {
   }
 
   if (!data || data.items.length === 0) {
-    return <p className="text-sm text-ink-muted py-4">No graded items yet.</p>
+    return <p className="text-sm text-ink-muted py-4">{t('noGradedItems')}</p>
   }
 
   const letter = letterGrade(data.percentage)
@@ -35,7 +37,7 @@ export function MyGrades({ courseId }: MyGradesProps) {
       {/* Summary */}
       <div className="rounded-lg border bg-surface-50 p-4 flex items-center justify-between">
         <div>
-          <p className="text-sm text-ink-muted">Overall Grade</p>
+          <p className="text-sm text-ink-muted">{t('overallGrade')}</p>
           <p className="text-2xl font-bold text-ink">{data.percentage.toFixed(1)}%</p>
           <p className="text-xs text-ink-subtle">{data.total_earned} / {data.total_possible} pts</p>
         </div>
@@ -61,7 +63,7 @@ export function MyGrades({ courseId }: MyGradesProps) {
             <span className="text-sm font-medium min-w-[80px] text-right">
               {item.score !== null
                 ? `${item.score} / ${item.max_points}`
-                : <span className="text-ink-subtle">Not graded</span>
+                : <span className="text-ink-subtle">{t('notGraded')}</span>
               }
             </span>
           </div>

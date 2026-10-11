@@ -77,6 +77,7 @@ export interface StartAttemptResponse {
   exam_id: string
   started_at: string
   expires_at: string
+  saved_answers: ExamMCQAnswerInput[]
   exam: ExamDTO
 }
 

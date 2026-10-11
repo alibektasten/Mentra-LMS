@@ -4,12 +4,14 @@ export interface ProfileResponse {
   id: string
   email: string
   name: string
+  avatar_url: string
   created_at: string
   updated_at: string
 }
 
 export interface UpdateProfileInput {
   name: string
+  avatar_url?: string
 }
 
 export async function getMe(): Promise<ProfileResponse> {

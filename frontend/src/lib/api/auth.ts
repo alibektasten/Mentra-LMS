@@ -10,7 +10,7 @@ export interface LoginInput {
 }
 
 // Shape the backend actually returns
-interface BackendLoginResponse {
+export interface BackendLoginResponse {
   access_token: string
   expires_at: string
   user: {
@@ -35,14 +35,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
   }
 }
 
-// Raw axios (no interceptor) for auth calls to avoid circular re-auth loops
-export async function login(orgSlug: string, input: LoginInput): Promise<LoginResponse> {
-  const res = await axios.post<ApiEnvelope<BackendLoginResponse>>(
-    `${API_URL}/auth/login`,
-    input,
-    { headers: { 'X-Org-Slug': orgSlug, 'Content-Type': 'application/json' } }
-  )
-  const raw = res.data.data
+export function toLoginResponse(raw: BackendLoginResponse): LoginResponse {
   const payload = decodeJwtPayload(raw.access_token)
   const role = (payload.role as Role) ?? 'student'
   const nameParts = raw.user.name.split(' ')
@@ -61,6 +54,31 @@ export async function login(orgSlug: string, input: LoginInput): Promise<LoginRe
   }
 }
 
+export function parseGoogleOAuthPayload(value: string): LoginResponse {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
+  return toLoginResponse(JSON.parse(atob(padded)) as BackendLoginResponse)
+}
+
+export async function getGoogleOAuthStatus(): Promise<boolean> {
+  const res = await axios.get<ApiEnvelope<{ enabled: boolean }>>(`${API_URL}/auth/google/status`)
+  return res.data.data?.enabled ?? false
+}
+
+export function getGoogleOAuthStartURL(orgSlug: string): string {
+  return `${API_URL}/auth/google/start?org=${encodeURIComponent(orgSlug)}`
+}
+
+// Raw axios (no interceptor) for auth calls to avoid circular re-auth loops
+export async function login(orgSlug: string, input: LoginInput): Promise<LoginResponse> {
+  const res = await axios.post<ApiEnvelope<BackendLoginResponse>>(
+    `${API_URL}/auth/login`,
+    input,
+    { headers: { 'X-Org-Slug': orgSlug, 'Content-Type': 'application/json' } }
+  )
+  return toLoginResponse(res.data.data)
+}
+
 export interface RegisterInput {
   email: string
   password: string
@@ -75,23 +93,7 @@ export async function superAdminLogin(input: LoginInput): Promise<LoginResponse>
     input,
     { headers: { 'Content-Type': 'application/json' } }
   )
-  const raw = res.data.data
-  const payload = decodeJwtPayload(raw.access_token)
-  const role = (payload.role as Role) ?? 'super_admin'
-  const nameParts = raw.user.name.split(' ')
-  return {
-    token: raw.access_token,
-    expiresAt: raw.expires_at,
-    role,
-    user: {
-      id: raw.user.id,
-      email: raw.user.email,
-      first_name: nameParts[0] ?? '',
-      last_name: nameParts.slice(1).join(' ') ?? '',
-      role,
-      org_id: '',
-    },
-  }
+  return toLoginResponse(res.data.data)
 }
 
 export async function register(orgSlug: string, input: RegisterInput): Promise<UserDTO> {

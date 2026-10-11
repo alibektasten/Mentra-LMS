@@ -31,6 +31,7 @@ func (uc *AssignmentUseCase) Create(ctx context.Context, courseID, moduleID, org
 		ModuleID:            moduleID,
 		Title:               req.Title,
 		Description:         req.Description,
+		Rubric:              req.Rubric,
 		MaxPoints:           req.MaxPoints,
 		DueDate:             req.DueDate,
 		AllowLateSubmission: req.AllowLateSubmission,
@@ -73,6 +74,9 @@ func (uc *AssignmentUseCase) Update(ctx context.Context, id, orgID uuid.UUID, re
 	}
 	if req.Description != nil {
 		a.Description = *req.Description
+	}
+	if req.Rubric != nil {
+		a.Rubric = *req.Rubric
 	}
 	if req.MaxPoints != nil {
 		a.MaxPoints = *req.MaxPoints
@@ -174,6 +178,13 @@ func (uc *AssignmentUseCase) GradeSubmission(ctx context.Context, submissionID, 
 	if err != nil {
 		return nil, err
 	}
+	assignment, err := uc.assignmentRepo.FindByID(ctx, s.AssignmentID, s.OrgID)
+	if err != nil {
+		return nil, err
+	}
+	if req.Score < 0 || req.Score > assignment.MaxPoints {
+		return nil, apperrors.ValidationError("score must be between 0 and the assignment maximum")
+	}
 	s.Score = &req.Score
 	s.Feedback = req.Feedback
 	s.GradedBy = &graderID
@@ -193,6 +204,7 @@ func toAssignmentDTO(a *entities.Assignment) *dto.AssignmentDTO {
 		ModuleID:            a.ModuleID.String(),
 		Title:               a.Title,
 		Description:         a.Description,
+		Rubric:              a.Rubric,
 		MaxPoints:           a.MaxPoints,
 		DueDate:             a.DueDate,
 		AllowLateSubmission: a.AllowLateSubmission,

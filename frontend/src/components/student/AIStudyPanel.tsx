@@ -33,7 +33,7 @@ export function AIStudyPanel({ courseId, courseTitle }: AIStudyPanelProps) {
     <div className="flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-semibold text-[#6b6b6b] uppercase tracking-widest">Study AI</p>
-        <span className="text-[10px] text-[#9b9b9b]">Ollama</span>
+        <span className="text-[10px] text-[#9b9b9b]">AI</span>
       </div>
 
       <div className="border border-[#e8e8e6] rounded-lg overflow-hidden">

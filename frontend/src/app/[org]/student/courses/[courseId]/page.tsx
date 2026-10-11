@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MyGrades } from '@/components/courses/MyGrades'
 import { UpcomingDeadlines } from '@/components/courses/UpcomingDeadlines'
 import { cn } from '@/lib/utils/cn'
+import { useI18n } from '@/lib/i18n'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -203,6 +204,7 @@ function ExamCard({ exam, org, courseId }: { exam: ExamListItemDTO; org: string;
 }
 
 function ExamListSection({ courseId, org }: { courseId: string; org: string }) {
+  const { t } = useI18n()
   const { data: exams, isLoading } = useExams(courseId)
   const examList = exams ?? []
 
@@ -212,7 +214,7 @@ function ExamListSection({ courseId, org }: { courseId: string; org: string }) {
     return (
       <div className="flex flex-col items-center justify-center py-14 rounded-xl border border-dashed border-[#e4e2de]">
         <GraduationCap className="h-7 w-7 text-[#d4d2ce] mb-2" />
-        <p className="text-sm text-[#9b9b9b]">No exams yet.</p>
+        <p className="text-sm text-[#9b9b9b]">{t('noExamsYet')}</p>
       </div>
     )
   }
@@ -227,6 +229,7 @@ function ExamListSection({ courseId, org }: { courseId: string; org: string }) {
 }
 
 function MyGroupSection({ courseId }: { courseId: string }) {
+  const { t } = useI18n()
   const { data: group, isLoading, isError } = useMyGroup(courseId)
   const { data: schedulesData } = useGroupSchedules(courseId, group?.id ?? '', )
 
@@ -239,11 +242,11 @@ function MyGroupSection({ courseId }: { courseId: string }) {
     <div className="rounded-xl border border-[#e4e2de] bg-white shadow-sm overflow-hidden">
       <div className="flex items-center gap-3 px-5 py-4 bg-[#f7f6f3] border-b border-[#e4e2de]">
         <Users className="h-4 w-4 text-[#6b6b6b]" />
-        <span className="text-sm font-semibold text-[#1a1a1a]">My Group — {group.name}</span>
+        <span className="text-sm font-semibold text-[#1a1a1a]">{t('myGroup')} — {group.name}</span>
       </div>
       {schedules.length > 0 && (
         <div className="px-5 py-4 space-y-2">
-          <p className="text-xs font-semibold text-[#9b9b9b] uppercase tracking-wide mb-2">Schedule</p>
+          <p className="text-xs font-semibold text-[#9b9b9b] uppercase tracking-wide mb-2">{t('schedule')}</p>
           {schedules.map((s) => (
             <div key={s.id} className="flex items-center gap-4 text-sm">
               <span className="w-8 text-xs font-medium text-[#6b6b6b]">{DAYS[s.day_of_week]}</span>
@@ -266,8 +269,9 @@ function MyGroupSection({ courseId }: { courseId: string }) {
 }
 
 export default function StudentCourseDetailPage() {
+  const { t } = useI18n()
   const { org, courseId } = useParams<{ org: string; courseId: string }>()
-  const { data: course, isLoading: courseLoading } = useCourse(courseId)
+  const { data: course, isLoading: courseLoading, isError: courseError } = useCourse(courseId)
   const { data: modulesData, isLoading: modulesLoading } = useModules(courseId)
   const { data: progressData } = useProgress(courseId)
   const { data: announcementsData } = useAnnouncements(courseId)
@@ -288,6 +292,22 @@ export default function StudentCourseDetailPage() {
     )
   }
 
+  if (courseError || !course) {
+    return (
+      <div className="max-w-3xl flex flex-col items-center justify-center py-24 text-center">
+        <BookOpen className="h-8 w-8 text-[#c9c9c9] mb-3" />
+        <p className="text-sm font-semibold text-[#1a1a1a] mb-1">Course unavailable</p>
+        <p className="text-xs text-[#9b9b9b] mb-4">This course may no longer be available to you.</p>
+        <Link
+          href={`/${org}/student/courses`}
+          className="inline-flex items-center gap-1.5 text-xs text-[#059669] hover:underline"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" /> Back to my courses
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-3xl py-2">
       <Link
@@ -300,8 +320,8 @@ export default function StudentCourseDetailPage() {
 
       {/* Course header */}
       <div className="mb-6">
-        <h1 className="text-[1.6rem] font-bold tracking-tight text-[#1a1a1a] leading-tight">{course?.title}</h1>
-        {course?.description && (
+        <h1 className="text-[1.6rem] font-bold tracking-tight text-[#1a1a1a] leading-tight">{course.title}</h1>
+        {course.description && (
           <p className="mt-1.5 text-sm text-[#6b6b6b] leading-relaxed">{course.description}</p>
         )}
         {/* Progress indicator */}
@@ -315,19 +335,19 @@ export default function StudentCourseDetailPage() {
 
       <Tabs defaultValue="content">
         <TabsList className="mb-5 bg-[#f0eeeb] border border-[#e4e2de]">
-          <TabsTrigger value="content">Content</TabsTrigger>
+          <TabsTrigger value="content">{t('content')}</TabsTrigger>
           <TabsTrigger value="announcements">
-            Announcements
+            {t('announcements')}
             {announcements.length > 0 && (
               <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white px-1">
                 {announcements.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="exams">Exams</TabsTrigger>
-          <TabsTrigger value="group">My Group</TabsTrigger>
-          <TabsTrigger value="grades">My Grades</TabsTrigger>
-          <TabsTrigger value="deadlines">Deadlines</TabsTrigger>
+          <TabsTrigger value="exams">{t('exams')}</TabsTrigger>
+          <TabsTrigger value="group">{t('groups')}</TabsTrigger>
+          <TabsTrigger value="grades">{t('grades')}</TabsTrigger>
+          <TabsTrigger value="deadlines">{t('deadlines')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="content">
@@ -338,7 +358,7 @@ export default function StudentCourseDetailPage() {
           ) : sortedModules.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-dashed border-[#e4e2de]">
               <BookOpen className="h-8 w-8 text-[#d4d2ce] mb-2" />
-              <p className="text-sm text-[#9b9b9b]">No content yet.</p>
+              <p className="text-sm text-[#9b9b9b]">{t('noContentYet')}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -361,7 +381,7 @@ export default function StudentCourseDetailPage() {
           {announcements.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-dashed border-[#e4e2de]">
               <Megaphone className="h-7 w-7 text-[#d4d2ce] mb-2" />
-              <p className="text-sm text-[#9b9b9b]">No announcements yet.</p>
+              <p className="text-sm text-[#9b9b9b]">{t('noAnnouncementsYet')}</p>
             </div>
           ) : (
             <div className="space-y-3">

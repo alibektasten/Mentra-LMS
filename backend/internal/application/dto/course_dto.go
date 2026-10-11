@@ -5,11 +5,13 @@ import "time"
 type CreateCourseRequest struct {
 	Title       string `json:"title" binding:"required"`
 	Description string `json:"description"`
+	Status      string `json:"status"`
 }
 
 type UpdateCourseRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	Status      string `json:"status"`
 }
 
 type CourseDTO struct {

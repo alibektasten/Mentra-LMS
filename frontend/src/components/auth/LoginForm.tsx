@@ -1,16 +1,18 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { loginSchema, LoginFormData } from '@/lib/validators/auth.schema'
-import { login, superAdminLogin } from '@/lib/api/auth'
+import { getGoogleOAuthStartURL, getGoogleOAuthStatus, login, superAdminLogin } from '@/lib/api/auth'
 import { useAuthStore } from '@/lib/stores/auth.store'
 import { getRoleBasePath } from '@/lib/utils/role-guard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Chrome } from 'lucide-react'
 
 interface LoginFormProps {
   orgSlug: string
@@ -21,6 +23,12 @@ interface LoginFormProps {
 export function LoginForm({ orgSlug, returnTo, isSuperAdmin }: LoginFormProps) {
   const router = useRouter()
   const setSession = useAuthStore((s) => s.setSession)
+  const [googleEnabled, setGoogleEnabled] = useState(false)
+
+  useEffect(() => {
+    if (isSuperAdmin || !orgSlug) return
+    getGoogleOAuthStatus().then(setGoogleEnabled).catch(() => setGoogleEnabled(false))
+  }, [isSuperAdmin, orgSlug])
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -67,6 +75,15 @@ export function LoginForm({ orgSlug, returnTo, isSuperAdmin }: LoginFormProps) {
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? 'Signing in...' : 'Sign in'}
       </Button>
+      {!isSuperAdmin && (
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center gap-3"><div className="h-px flex-1 bg-border" /><span className="text-[11px] text-muted-foreground">or</span><div className="h-px flex-1 bg-border" /></div>
+          <Button type="button" variant="outline" className="w-full" disabled={!googleEnabled} onClick={() => { window.location.assign(getGoogleOAuthStartURL(orgSlug)) }}>
+            <Chrome className="mr-2 h-4 w-4" />Continue with Google
+          </Button>
+          {!googleEnabled && <p className="text-center text-xs text-muted-foreground">Google sign-in will be available after the organization adds its OAuth credentials.</p>}
+        </div>
+      )}
     </form>
   )
 }
