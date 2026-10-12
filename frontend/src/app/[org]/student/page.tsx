@@ -5,7 +5,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useCourses } from '@/lib/queries/courses.queries'
 import { useProgress } from '@/lib/queries/progress.queries'
 import { useStudentLessonContexts } from '@/lib/queries/student-lesson-context.queries'
-import { getUpcomingDeadlines } from '@/lib/api/grades'
+import { getMyGrades, getUpcomingDeadlines } from '@/lib/api/grades'
 import { gradeKeys } from '@/lib/queries/grades.queries'
 import { WelcomeHero } from '@/components/student/WelcomeHero'
 import { StatsStrip } from '@/components/student/StatsStrip'
@@ -30,6 +30,16 @@ export default function StudentDashboard() {
       staleTime: 60_000,
     })),
   })
+  const gradeQueries = useQueries({
+    queries: publishedCourses.map((course) => ({
+      queryKey: gradeKeys.myGrades(course.id),
+      queryFn: () => getMyGrades(course.id),
+      staleTime: 60_000,
+    })),
+  })
+  const gradesByCourse = useMemo(() => Object.fromEntries(
+    publishedCourses.map((course, index) => [course.id, gradeQueries[index]?.data])
+  ), [gradeQueries, publishedCourses])
   const deadlines = useMemo(() => deadlineQueries.flatMap((query, index) => {
     const course = publishedCourses[index]
     if (!course) return []
@@ -89,7 +99,7 @@ export default function StudentDashboard() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-8">
         {/* Left column — primary content */}
         <div className="space-y-8">
-          <RecentCourses courses={courses} isLoading={coursesLoading} />
+          <RecentCourses courses={courses} isLoading={coursesLoading} gradesByCourse={gradesByCourse} />
           <ActivityFeed progress={progress} lessonContexts={lessonContexts} />
         </div>
 
