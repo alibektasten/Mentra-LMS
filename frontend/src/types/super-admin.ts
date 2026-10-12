@@ -6,6 +6,7 @@ export interface OrgDTO {
 }
 
 export interface AdminUserDTO {
+	membership_id: string
   id: string
   email: string
   name: string

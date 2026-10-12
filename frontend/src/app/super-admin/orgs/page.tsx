@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Building2, Plus, Trash2 } from 'lucide-react'
+import { Building2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useAdminOrgs, useCreateOrg, useDeleteOrg } from '@/lib/queries/super-admin.queries'
+import { useAdminOrgs, useCreateOrg, useDeleteOrg, useUpdateOrg } from '@/lib/queries/super-admin.queries'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -17,10 +17,12 @@ export default function SuperAdminOrgsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
+  const [editingID, setEditingID] = useState<string | null>(null)
   const pageSize = 20
   const { data, isLoading } = useAdminOrgs({ page, page_size: pageSize })
   const deleteOrg = useDeleteOrg()
   const createOrg = useCreateOrg()
+  const updateOrg = useUpdateOrg()
 
   const orgs = data?.data ?? []
   const total = data?.meta?.total ?? 0
@@ -49,12 +51,20 @@ export default function SuperAdminOrgsPage() {
       toast.error(e?.response?.data?.error?.message ?? 'Failed to create organization')
     }
   }
+  const openEdit = (org: { id: string; name: string; slug: string }) => { setEditingID(org.id); setName(org.name); setSlug(org.slug); setCreateOpen(true) }
+  const handleSave = async () => {
+    try {
+      if (editingID) { const org = await updateOrg.mutateAsync({ id: editingID, name: name.trim(), slug: slug.trim().toLowerCase() }); toast.success(`Organization “${org.name}” updated`) }
+      else { await handleCreate(); return }
+      setCreateOpen(false); setEditingID(null); setName(''); setSlug('')
+    } catch { toast.error('Could not save organization') }
+  }
 
   return (
     <div className="space-y-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <PageHeader title="Organizations" description={`${total} total`} />
-        <Button onClick={() => setCreateOpen(true)} className="gap-2 rounded-xl bg-blue-600 shadow-lg shadow-blue-600/20 hover:bg-blue-700">
+        <Button onClick={() => { setEditingID(null); setName(''); setSlug(''); setCreateOpen(true) }} className="gap-2 rounded-xl bg-blue-600 shadow-lg shadow-blue-600/20 hover:bg-blue-700">
           <Plus className="h-4 w-4" /> Create organization
         </Button>
       </div>
@@ -85,7 +95,8 @@ export default function SuperAdminOrgsPage() {
                       <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-50 text-blue-600"><Building2 className="h-4 w-4" /></span><span className="font-semibold text-slate-700 dark:text-slate-100">{org.name}</span></div></td>
                       <td className="px-5 py-4"><span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-300">/{org.slug}</span></td>
                       <td className="px-5 py-4 text-slate-400">{new Date(org.created_at).toLocaleDateString()}</td>
-                      <td className="px-5 py-4">
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <Button variant="ghost" size="sm" aria-label={`Edit ${org.name}`} className="mr-1 h-8 w-8 rounded-lg p-0 text-slate-400 hover:bg-blue-50 hover:text-blue-600" onClick={() => openEdit(org)}><Pencil className="h-3.5 w-3.5" /></Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -118,7 +129,7 @@ export default function SuperAdminOrgsPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Building2 className="h-5 w-5" /> New organization</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Building2 className="h-5 w-5" /> {editingID ? 'Edit organization' : 'New organization'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
@@ -132,9 +143,9 @@ export default function SuperAdminOrgsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button disabled={createOrg.isPending || name.trim().length < 2 || slug.trim().length < 2} onClick={handleCreate}>
-              {createOrg.isPending ? 'Creating…' : 'Create organization'}
+            <Button variant="outline" onClick={() => { setCreateOpen(false); setEditingID(null) }}>Cancel</Button>
+            <Button disabled={createOrg.isPending || updateOrg.isPending || name.trim().length < 2 || slug.trim().length < 2} onClick={handleSave}>
+              {createOrg.isPending || updateOrg.isPending ? 'Saving…' : editingID ? 'Save changes' : 'Create organization'}
             </Button>
           </DialogFooter>
         </DialogContent>

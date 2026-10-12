@@ -31,6 +31,7 @@ type SystemUserFilters struct {
 }
 
 type SystemUser struct {
+	MembershipID string
 	ID        uuid.UUID
 	Email     string
 	Name      string

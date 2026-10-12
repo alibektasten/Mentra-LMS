@@ -17,6 +17,11 @@ export async function createOrg(input: { name: string; slug: string }): Promise<
   return res.data
 }
 
+export async function updateOrg(id: string, input: { name: string; slug: string }): Promise<OrgDTO> {
+  const res = await apiClient.put<OrgDTO>(`/super-admin/orgs/${id}`, input)
+  return res.data
+}
+
 export async function deleteOrg(id: string): Promise<void> {
   await apiClient.delete(`/super-admin/orgs/${id}`)
 }
@@ -25,6 +30,8 @@ export async function listAllUsers(params?: SystemUserFilters): Promise<Paginate
   const res = await apiClient.get('/super-admin/users', { params })
   return res.data
 }
+
+export async function updateSystemUserRole(membershipID: string, role: string): Promise<void> { await apiClient.put(`/super-admin/users/${membershipID}/role`, { role }) }
 
 export async function inviteOrgAdmin(input: InviteOrgAdminInput): Promise<AdminUserDTO> {
   const res = await apiClient.post<AdminUserDTO>('/super-admin/orgs/invite-admin', input)

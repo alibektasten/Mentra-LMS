@@ -51,10 +51,20 @@ export function useCreateOrg() {
   })
 }
 
+export function useUpdateOrg() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: ({ id, ...input }: { id: string; name: string; slug: string }) => superAdminApi.updateOrg(id, input), onSuccess: () => qc.invalidateQueries({ queryKey: ['super-admin', 'orgs'] }) })
+}
+
 export function useInviteOrgAdmin() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: InviteOrgAdminInput) => superAdminApi.inviteOrgAdmin(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['super-admin', 'users'] }),
   })
+}
+
+export function useUpdateSystemUserRole() {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: ({ membershipID, role }: { membershipID: string; role: string }) => superAdminApi.updateSystemUserRole(membershipID, role), onSuccess: () => qc.invalidateQueries({ queryKey: ['super-admin', 'users'] }) })
 }

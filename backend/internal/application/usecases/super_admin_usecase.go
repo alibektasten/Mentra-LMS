@@ -72,6 +72,21 @@ func (uc *SuperAdminUseCase) CreateOrg(ctx context.Context, req dto.CreateOrgani
 	return &dto.OrgDTO{ID: org.ID.String(), Name: org.Name, Slug: org.Slug, CreatedAt: org.CreatedAt}, nil
 }
 
+func (uc *SuperAdminUseCase) UpdateOrg(ctx context.Context, id uuid.UUID, req dto.UpdateOrganizationRequest) (*dto.OrgDTO, error) {
+	org, err := uc.orgRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if existing, _ := uc.orgRepo.FindBySlug(ctx, req.Slug); existing != nil && existing.ID != id {
+		return nil, apperrors.ConflictError("organization slug")
+	}
+	org.Name, org.Slug = req.Name, req.Slug
+	if err := uc.orgRepo.Update(ctx, org); err != nil {
+		return nil, err
+	}
+	return &dto.OrgDTO{ID: org.ID.String(), Name: org.Name, Slug: org.Slug, CreatedAt: org.CreatedAt}, nil
+}
+
 func (uc *SuperAdminUseCase) ListUsers(ctx context.Context, filters repositories.SystemUserFilters) ([]dto.AdminUserDTO, int64, error) {
 	users, total, err := uc.userRepo.ListForSystemAdmin(ctx, filters)
 	if err != nil {
@@ -80,16 +95,47 @@ func (uc *SuperAdminUseCase) ListUsers(ctx context.Context, filters repositories
 	result := make([]dto.AdminUserDTO, len(users))
 	for i, u := range users {
 		result[i] = dto.AdminUserDTO{
-			ID:        u.ID.String(),
-			Email:     u.Email,
-			Name:      u.Name,
-			Role:      u.Role,
-			OrgID:     u.OrgID,
-			OrgName:   u.OrgName,
-			CreatedAt: u.CreatedAt,
+			MembershipID: u.MembershipID,
+			ID:           u.ID.String(),
+			Email:        u.Email,
+			Name:         u.Name,
+			Role:         u.Role,
+			OrgID:        u.OrgID,
+			OrgName:      u.OrgName,
+			CreatedAt:    u.CreatedAt,
 		}
 	}
 	return result, total, nil
+}
+
+func (uc *SuperAdminUseCase) UpdateUserRole(ctx context.Context, membershipID uuid.UUID, req dto.UpdateSystemUserRoleRequest) error {
+	orgs, _, err := uc.orgRepo.ListAll(ctx, 1, 100)
+	if err != nil {
+		return err
+	}
+	var membership *entities.Membership
+	for _, org := range orgs {
+		found, findErr := uc.memberRepo.FindByID(ctx, membershipID, org.ID)
+		if findErr == nil {
+			membership = found
+			break
+		}
+	}
+	if membership == nil {
+		return apperrors.NotFoundError("membership", membershipID.String())
+	}
+	newRole := entities.Role(req.Role)
+	if membership.Role == entities.RoleAdmin && newRole != entities.RoleAdmin {
+		_, admins, err := uc.memberRepo.FindByOrgFiltered(ctx, membership.OrgID, string(entities.RoleAdmin), 1, 1)
+		if err != nil {
+			return err
+		}
+		if admins <= 1 {
+			return apperrors.ValidationError("an organization must keep at least one administrator")
+		}
+	}
+	membership.Role = newRole
+	return uc.memberRepo.Update(ctx, membership)
 }
 
 func (uc *SuperAdminUseCase) GetStats(ctx context.Context) (*dto.SystemStatsDTO, error) {

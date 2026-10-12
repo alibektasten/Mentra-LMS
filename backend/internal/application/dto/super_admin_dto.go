@@ -10,13 +10,14 @@ type OrgDTO struct {
 }
 
 type AdminUserDTO struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	Role      string    `json:"role"`
-	OrgID     string    `json:"org_id"`
-	OrgName   string    `json:"org_name"`
-	CreatedAt time.Time `json:"created_at"`
+	MembershipID string    `json:"membership_id"`
+	ID           string    `json:"id"`
+	Email        string    `json:"email"`
+	Name         string    `json:"name"`
+	Role         string    `json:"role"`
+	OrgID        string    `json:"org_id"`
+	OrgName      string    `json:"org_name"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type SystemStatsDTO struct {
@@ -34,4 +35,13 @@ type InviteOrgAdminRequest struct {
 type CreateOrganizationRequest struct {
 	Name string `json:"name" binding:"required,min=2,max=120"`
 	Slug string `json:"slug" binding:"required,min=2,max=63,alphanum"`
+}
+
+type UpdateOrganizationRequest struct {
+	Name string `json:"name" binding:"required,min=2,max=120"`
+	Slug string `json:"slug" binding:"required,min=2,max=63,alphanum"`
+}
+
+type UpdateSystemUserRoleRequest struct {
+	Role string `json:"role" binding:"required,oneof=admin teacher student"`
 }

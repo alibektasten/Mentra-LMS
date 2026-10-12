@@ -17,6 +17,11 @@ func (m *MockOrganizationRepository) Create(ctx context.Context, org *entities.O
 	return args.Error(0)
 }
 
+func (m *MockOrganizationRepository) Update(ctx context.Context, org *entities.Organization) error {
+	args := m.Called(ctx, org)
+	return args.Error(0)
+}
+
 func (m *MockOrganizationRepository) FindByID(ctx context.Context, id uuid.UUID) (*entities.Organization, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {

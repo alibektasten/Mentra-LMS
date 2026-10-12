@@ -91,7 +91,7 @@ func (r *GORMUserRepository) ListAll(ctx context.Context, page, pageSize int) ([
 func (r *GORMUserRepository) ListForSystemAdmin(ctx context.Context, filters domainrepos.SystemUserFilters) ([]domainrepos.SystemUser, int64, error) {
 	query := r.db.WithContext(ctx).
 		Table("users").
-		Select(`users.id, users.email, users.name, COALESCE(NULLIF(memberships.role, ''), NULLIF(users.role, ''), 'unassigned') AS role,
+		Select(`COALESCE(memberships.id::text, '') AS membership_id, users.id, users.email, users.name, COALESCE(NULLIF(memberships.role, ''), NULLIF(users.role, ''), 'unassigned') AS role,
 			COALESCE(memberships.org_id::text, '') AS org_id, COALESCE(organizations.name, 'System') AS org_name, users.created_at`).
 		Joins("LEFT JOIN memberships ON memberships.user_id = users.id").
 		Joins("LEFT JOIN organizations ON organizations.id = memberships.org_id")

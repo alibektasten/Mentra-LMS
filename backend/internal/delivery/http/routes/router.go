@@ -78,8 +78,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	sa.GET("/stats", deps.SuperAdminHandler.GetStats)
 	sa.GET("/orgs", deps.SuperAdminHandler.ListOrgs)
 	sa.POST("/orgs", deps.SuperAdminHandler.CreateOrg)
+	sa.PUT("/orgs/:id", deps.SuperAdminHandler.UpdateOrg)
 	sa.DELETE("/orgs/:id", deps.SuperAdminHandler.DeleteOrg)
 	sa.GET("/users", deps.SuperAdminHandler.ListUsers)
+	sa.PUT("/users/:membershipID/role", deps.SuperAdminHandler.UpdateUserRole)
 	sa.POST("/orgs/invite-admin", deps.SuperAdminHandler.InviteOrgAdmin)
 
 	// Public routes

@@ -87,6 +87,25 @@ func (h *SuperAdminHandler) CreateOrg(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": result})
 }
 
+func (h *SuperAdminHandler) UpdateOrg(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.Error(apperrors.ValidationError("invalid org id"))
+		return
+	}
+	var req dto.UpdateOrganizationRequest
+	if err := bindJSON(c, &req); err != nil {
+		c.Error(err)
+		return
+	}
+	result, err := h.superAdminUC.UpdateOrg(c.Request.Context(), id, req)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": result})
+}
+
 func (h *SuperAdminHandler) DeleteOrg(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -131,6 +150,24 @@ func (h *SuperAdminHandler) ListUsers(c *gin.Context) {
 			"total":     total,
 		},
 	})
+}
+
+func (h *SuperAdminHandler) UpdateUserRole(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("membershipID"))
+	if err != nil {
+		c.Error(apperrors.ValidationError("invalid membership id"))
+		return
+	}
+	var req dto.UpdateSystemUserRoleRequest
+	if err := bindJSON(c, &req); err != nil {
+		c.Error(err)
+		return
+	}
+	if err := h.superAdminUC.UpdateUserRole(c.Request.Context(), id, req); err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"updated": true}})
 }
 
 func (h *SuperAdminHandler) InviteOrgAdmin(c *gin.Context) {
