@@ -7,15 +7,17 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
-function StatCard({ title, value, caption, icon: Icon, tint }: {
+function StatCard({ title, value, caption, icon: Icon, tint, href }: {
   title: string
   value: string | number
   caption: string
   icon: React.ElementType
   tint: string
+  href: string
 }) {
   return (
-    <Card className="sa-card overflow-hidden rounded-2xl border-0">
+    <Link href={href} className="group block rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+    <Card className="sa-card h-full overflow-hidden rounded-2xl border-0 transition duration-200 group-hover:-translate-y-0.5 group-hover:border-blue-200 group-hover:shadow-lg">
       <CardHeader className="flex flex-row items-start justify-between pb-3">
         <div>
           <CardTitle className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{title}</CardTitle>
@@ -24,9 +26,9 @@ function StatCard({ title, value, caption, icon: Icon, tint }: {
         <div className={`rounded-xl p-2.5 ${tint}`}><Icon className="h-5 w-5" /></div>
       </CardHeader>
       <CardContent>
-        <p className="text-xs font-medium text-slate-400">{caption}</p>
+        <div className="flex items-center justify-between gap-2"><p className="text-xs font-medium text-slate-400">{caption}</p><ArrowUpRight className="h-4 w-4 text-blue-600 opacity-0 transition group-hover:opacity-100" /></div>
       </CardContent>
-    </Card>
+    </Card></Link>
   )
 }
 
@@ -46,14 +48,14 @@ export default function SuperAdminDashboard() {
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl" />)
         ) : (
           <>
-            <StatCard title="Organizations" value={stats?.total_orgs ?? 0} caption="Active workspaces" icon={Building2} tint="bg-blue-50 text-blue-600" />
-            <StatCard title="Platform users" value={stats?.total_users ?? 0} caption="Accounts across all tenants" icon={Users} tint="bg-violet-50 text-violet-600" />
-            <StatCard title="System status" value="Healthy" caption="API and access controls operational" icon={Activity} tint="bg-emerald-50 text-emerald-600" />
+            <StatCard title="Organizations" value={stats?.total_orgs ?? 0} caption="Active workspaces" icon={Building2} tint="bg-blue-50 text-blue-600" href="/super-admin/orgs" />
+            <StatCard title="Platform users" value={stats?.total_users ?? 0} caption="Accounts across all tenants" icon={Users} tint="bg-violet-50 text-violet-600" href="/super-admin/users" />
+            <StatCard title="System status" value="Healthy" caption="API and access controls operational" icon={Activity} tint="bg-emerald-50 text-emerald-600" href="/super-admin/dashboard#readiness" />
           </>
         )}
       </div>
       <div className="grid gap-5 lg:grid-cols-[1.45fr_1fr]">
-        <Card className="sa-card rounded-2xl border-0">
+        <Card id="readiness" className="sa-card rounded-2xl border-0">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-base text-slate-800 dark:text-slate-100">Platform operations</CardTitle>
