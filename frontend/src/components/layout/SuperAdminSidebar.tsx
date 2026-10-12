@@ -32,7 +32,7 @@ export function SuperAdminSidebar({ mobileOpen = false, onClose }: SuperAdminSid
   }
 
   return (
-    <aside className={`sa-sidebar fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[272px] shrink-0 flex-col !bg-slate-950 shadow-2xl transition-transform duration-300 lg:static lg:h-auto lg:min-h-screen lg:self-stretch lg:translate-x-0 lg:shadow-none ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`sa-sidebar fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[272px] shrink-0 flex-col !bg-slate-950 shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:z-auto lg:self-start lg:translate-x-0 lg:shadow-none ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="flex h-[84px] items-center gap-3 px-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 text-sm font-black text-white shadow-lg shadow-blue-950/30">
           M
