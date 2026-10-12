@@ -4,6 +4,10 @@ export interface GradeItemDTO {
   title: string;
   max_points: number;
   score: number | null;
+  status: 'not_submitted' | 'submitted' | 'graded';
+  feedback: string;
+  submitted_at: string | null;
+  graded_at: string | null;
 }
 
 export interface StudentGradeDTO {

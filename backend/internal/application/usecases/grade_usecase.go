@@ -46,12 +46,21 @@ func (uc *GradeUseCase) GetMyGrades(ctx context.Context, courseID, studentID, or
 			ItemType:  "assignment",
 			Title:     a.Title,
 			MaxPoints: a.MaxPoints,
+			Status:    "not_submitted",
 		}
 		totalPossible += a.MaxPoints
 		sub, err := uc.assignmentRepo.FindSubmission(ctx, a.ID, studentID)
-		if err == nil && sub != nil && sub.Score != nil {
-			item.Score = sub.Score
-			totalEarned += *sub.Score
+		if err == nil && sub != nil {
+			item.SubmittedAt = &sub.SubmittedAt
+			item.Feedback = sub.Feedback
+			if sub.Score != nil {
+				item.Score = sub.Score
+				item.GradedAt = sub.GradedAt
+				item.Status = "graded"
+				totalEarned += *sub.Score
+			} else {
+				item.Status = "submitted"
+			}
 		}
 		items = append(items, item)
 	}
