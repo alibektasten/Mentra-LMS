@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckCircle2, Circle } from 'lucide-react'
+import { BookOpen, CheckCircle2, Circle } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useProgress } from '@/lib/queries/progress.queries'
@@ -12,7 +12,7 @@ import { formatDate, formatPercent, normalizePercentage } from '@/lib/utils/form
 import { useI18n } from '@/lib/i18n'
 
 export default function StudentProgressPage() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const { org } = useParams<{ org: string }>()
   const { data: progress = [], isLoading } = useProgress()
   const { data: coursesData } = useCourses({ page: 1, page_size: 100 })
@@ -37,6 +37,19 @@ export default function StudentProgressPage() {
   const recent = [...progress]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 20)
+  const activityGroups = recent.reduce<Array<{ id: string; title: string; items: typeof recent; latest: string }>>((groups, item) => {
+    const context = lessonContexts.get(item.lesson_id)
+    const id = context?.courseID ?? 'other'
+    const title = context?.courseTitle ?? (locale === 'ru' ? 'Другие учебные активности' : locale === 'kk' ? 'Басқа оқу белсенділігі' : 'Other learning activity')
+    const group = groups.find((candidate) => candidate.id === id)
+    if (group) {
+      group.items.push(item)
+      if (new Date(item.created_at) > new Date(group.latest)) group.latest = item.created_at
+    } else {
+      groups.push({ id, title, items: [item], latest: item.created_at })
+    }
+    return groups
+  }, []).sort((a, b) => new Date(b.latest).getTime() - new Date(a.latest).getTime())
 
   return (
     <div className="max-w-3xl">
@@ -69,8 +82,11 @@ export default function StudentProgressPage() {
             <p className="text-sm text-[#9b9b9b]">No activity yet — complete a lesson to see it here.</p>
           </div>
         ) : (
-          <div className="divide-y divide-[#e8e8e6] border border-[#e8e8e6] rounded-lg overflow-hidden">
-            {recent.map((p) => {
+          <div className="space-y-4">
+            {activityGroups.map((group) => <section key={group.id} className="overflow-hidden rounded-xl border border-[#e8e8e6]">
+              <div className="flex items-center gap-2 border-b border-[#e8e8e6] bg-[#fbfbfa] px-3.5 py-2.5"><BookOpen className="h-4 w-4 text-emerald-600" /><p className="truncate text-xs font-bold text-[#3b3b3b]">{group.title}</p><span className="ml-auto text-[11px] text-[#9b9b9b]">{group.items.length}</span></div>
+              <div className="divide-y divide-[#e8e8e6]">
+            {group.items.map((p) => {
               const context = lessonContexts.get(p.lesson_id)
               const activityLabel = p.completed_at ? t('completedLesson') : t('startedLesson')
               const content = <>
@@ -96,6 +112,8 @@ export default function StudentProgressPage() {
               </>
               return context ? <Link key={p.id} href={`/${org}/student/courses/${context.courseID}/lessons/${context.lessonID}`} className="flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-[#f7f7f5]">{content}</Link> : <div key={p.id} className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-[#f7f7f5] transition-colors">{content}</div>
             })}
+              </div>
+            </section>)}
           </div>
         )}
       </div>
