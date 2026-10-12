@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { useReAuthStore } from '@/lib/stores/reauth.store'
 import { useAuthStore } from '@/lib/stores/auth.store'
 import { reAuthSchema, ReAuthFormData } from '@/lib/validators/auth.schema'
-import { login } from '@/lib/api/auth'
+import { login, superAdminLogin } from '@/lib/api/auth'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,21 +16,24 @@ import { Label } from '@/components/ui/label'
 export function ReAuthModal() {
   const router = useRouter()
   const { isOpen, prefillEmail, resolve, reject } = useReAuthStore()
-  const { orgSlug, setSession } = useAuthStore()
+  const { orgSlug, role, setSession } = useAuthStore()
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<ReAuthFormData>({
     resolver: zodResolver(reAuthSchema),
   })
 
   const onSubmit = async (data: ReAuthFormData) => {
-    if (!orgSlug) return
     try {
-      const result = await login(orgSlug, { email: prefillEmail, password: data.password })
+      const isSuperAdmin = role === 'super_admin'
+      if (!orgSlug && !isSuperAdmin) return
+      const result = isSuperAdmin
+        ? await superAdminLogin({ email: prefillEmail, password: data.password })
+        : await login(orgSlug!, { email: prefillEmail, password: data.password })
       setSession({
         token: result.token,
         user: result.user,
         role: result.role,
-        orgSlug,
+        orgSlug: isSuperAdmin ? '' : orgSlug!,
         expiresAt: result.expiresAt,
       })
       reset()

@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { Menu, ShieldCheck, Bell, Building2, Users, X, CheckCheck } from 'lucide-react'
 import { SuperAdminSidebar } from '@/components/layout/SuperAdminSidebar'
 import { useSystemStats } from '@/lib/queries/super-admin.queries'
+import { ReAuthModal } from '@/components/auth/ReAuthModal'
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -52,6 +53,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
           {children}
         </div>
       </main>
+      <ReAuthModal />
     </div>
   )
 }
