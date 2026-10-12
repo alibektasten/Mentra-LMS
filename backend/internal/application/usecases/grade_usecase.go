@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/ailms/backend/internal/application/dto"
@@ -224,5 +225,48 @@ func (uc *GradeUseCase) GetUpcomingDeadlines(ctx context.Context, courseID, stud
 		})
 	}
 
+	// Scheduled weighted assessments belong alongside regular assignments in a
+	// student's deadline list. This makes the course timeline reflect the full
+	// grading plan rather than only module assignments.
+	if uc.examRepo != nil && uc.examAttemptRepo != nil {
+		exams, err := uc.examRepo.FindByCourse(ctx, courseID, orgID)
+		if err != nil {
+			return nil, err
+		}
+		for _, exam := range exams {
+			if exam.DueDate == nil || exam.DueDate.Before(now) || !isScheduledAssessment(exam.AssessmentType) {
+				continue
+			}
+
+			attempts, err := uc.examAttemptRepo.FindByExamAndStudent(ctx, exam.ID, studentID)
+			if err != nil {
+				return nil, err
+			}
+			submitted := false
+			for _, attempt := range attempts {
+				if attempt.SubmittedAt != nil || attempt.Status == "submitted" {
+					submitted = true
+					break
+				}
+			}
+
+			deadlines = append(deadlines, dto.DeadlineItemDTO{
+				ItemID:    exam.ID.String(),
+				ItemType:  exam.AssessmentType,
+				Title:     exam.Title,
+				DueDate:   *exam.DueDate,
+				Submitted: submitted,
+			})
+		}
+	}
+
+	sort.Slice(deadlines, func(i, j int) bool {
+		return deadlines[i].DueDate.Before(deadlines[j].DueDate)
+	})
+
 	return deadlines, nil
+}
+
+func isScheduledAssessment(value string) bool {
+	return value == "midterm" || value == "endterm" || value == "final"
 }

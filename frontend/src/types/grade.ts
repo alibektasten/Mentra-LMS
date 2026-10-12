@@ -28,7 +28,7 @@ export interface StudentGradeDTO {
 
 export interface DeadlineItemDTO {
   item_id: string;
-  item_type: 'assignment' | 'quiz';
+  item_type: 'assignment' | 'quiz' | 'midterm' | 'endterm' | 'final';
   title: string;
   due_date: string;
   submitted: boolean;
