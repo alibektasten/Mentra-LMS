@@ -19,6 +19,7 @@ const PAGE_TITLES: Record<string, string> = {
   '': 'Dashboard',
   'courses': 'My Courses',
   'progress': 'Progress',
+  'grades': 'My grades',
   'ai': 'Study AI',
   'certificates': 'Certificates',
   'analytics': 'Analytics',

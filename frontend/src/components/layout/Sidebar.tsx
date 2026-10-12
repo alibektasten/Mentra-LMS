@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, Users, BarChart2, Sparkles, Settings,
-  GraduationCap, Award, User, X,
+  GraduationCap, Award, ClipboardCheck, User, X,
 } from 'lucide-react'
 import { useAuthStore } from '@/lib/stores/auth.store'
 import { NavItem } from './NavItem'
@@ -45,6 +45,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     { href: `/${org}/student`, label: t('dashboard'), icon: LayoutDashboard },
     { href: `/${org}/student/courses`, label: t('myCourses'), icon: BookOpen },
     { href: `/${org}/student/progress`, label: t('progress'), icon: GraduationCap },
+    { href: `/${org}/student/grades`, label: t('grades'), icon: ClipboardCheck },
     { href: `/${org}/student/ai`, label: t('ai'), icon: Sparkles },
     { href: `/${org}/student/certificates`, label: t('certificates'), icon: Award },
     { href: `/${org}/student/settings`, label: t('personalSettings'), icon: Settings },
