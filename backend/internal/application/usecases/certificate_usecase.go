@@ -12,16 +12,19 @@ import (
 )
 
 type CertificateUseCase struct {
-	certificateRepo repositories.CertificateRepository
-	groupRepo       repositories.GroupRepository
-	courseRepo      repositories.CourseRepository
-	moduleRepo      repositories.ModuleRepository
-	lessonRepo      repositories.LessonRepository
-	progressRepo    repositories.LessonProgressRepository
+	certificateRepo   repositories.CertificateRepository
+	groupRepo         repositories.GroupRepository
+	courseRepo        repositories.CourseRepository
+	moduleRepo        repositories.ModuleRepository
+	lessonRepo        repositories.LessonRepository
+	progressRepo      repositories.LessonProgressRepository
+	userRepo          repositories.UserRepository
+	organizationRepo  repositories.OrganizationRepository
+	courseTeacherRepo repositories.CourseTeacherRepository
 }
 
-func NewCertificateUseCase(certificateRepo repositories.CertificateRepository, groupRepo repositories.GroupRepository, courseRepo repositories.CourseRepository, moduleRepo repositories.ModuleRepository, lessonRepo repositories.LessonRepository, progressRepo repositories.LessonProgressRepository) *CertificateUseCase {
-	return &CertificateUseCase{certificateRepo: certificateRepo, groupRepo: groupRepo, courseRepo: courseRepo, moduleRepo: moduleRepo, lessonRepo: lessonRepo, progressRepo: progressRepo}
+func NewCertificateUseCase(certificateRepo repositories.CertificateRepository, groupRepo repositories.GroupRepository, courseRepo repositories.CourseRepository, moduleRepo repositories.ModuleRepository, lessonRepo repositories.LessonRepository, progressRepo repositories.LessonProgressRepository, userRepo repositories.UserRepository, organizationRepo repositories.OrganizationRepository, courseTeacherRepo repositories.CourseTeacherRepository) *CertificateUseCase {
+	return &CertificateUseCase{certificateRepo: certificateRepo, groupRepo: groupRepo, courseRepo: courseRepo, moduleRepo: moduleRepo, lessonRepo: lessonRepo, progressRepo: progressRepo, userRepo: userRepo, organizationRepo: organizationRepo, courseTeacherRepo: courseTeacherRepo}
 }
 
 // ListForStudent issues any newly earned certificates before returning them.
@@ -42,11 +45,11 @@ func (uc *CertificateUseCase) ListForStudent(ctx context.Context, userID, orgID 
 	}
 	result := make([]dto.CertificateDTO, 0, len(certificates))
 	for _, certificate := range certificates {
-		course, err := uc.courseRepo.FindByID(ctx, certificate.CourseID, orgID)
+		certificateDTO, err := uc.toCertificateDTO(ctx, &certificate)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, toCertificateDTO(&certificate, course.Title))
+		result = append(result, certificateDTO)
 	}
 	return result, nil
 }
@@ -56,12 +59,45 @@ func (uc *CertificateUseCase) Verify(ctx context.Context, code string) (*dto.Cer
 	if err != nil {
 		return nil, err
 	}
-	course, err := uc.courseRepo.FindByID(ctx, certificate.CourseID, certificate.OrgID)
+	result, err := uc.toCertificateDTO(ctx, certificate)
 	if err != nil {
 		return nil, err
 	}
-	result := toCertificateDTO(certificate, course.Title)
 	return &result, nil
+}
+
+func (uc *CertificateUseCase) toCertificateDTO(ctx context.Context, certificate *entities.Certificate) (dto.CertificateDTO, error) {
+	course, err := uc.courseRepo.FindByID(ctx, certificate.CourseID, certificate.OrgID)
+	if err != nil {
+		return dto.CertificateDTO{}, err
+	}
+	student, err := uc.userRepo.FindByID(ctx, certificate.UserID)
+	if err != nil {
+		return dto.CertificateDTO{}, err
+	}
+	organization, err := uc.organizationRepo.FindByID(ctx, certificate.OrgID)
+	if err != nil {
+		return dto.CertificateDTO{}, err
+	}
+
+	teacherName := "Mentra LMS Academic Office"
+	teachers, err := uc.courseTeacherRepo.ListByCourse(ctx, certificate.CourseID, certificate.OrgID)
+	if err != nil {
+		return dto.CertificateDTO{}, err
+	}
+	if len(teachers) > 0 {
+		teacher, err := uc.userRepo.FindByID(ctx, teachers[0].TeacherID)
+		if err != nil {
+			return dto.CertificateDTO{}, err
+		}
+		teacherName = teacher.Name
+	}
+
+	return dto.CertificateDTO{
+		ID: certificate.ID.String(), CourseID: certificate.CourseID.String(), CourseTitle: course.Title,
+		StudentName: student.Name, TeacherName: teacherName, OrganizationName: organization.Name,
+		VerificationCode: certificate.VerificationCode, IssuedAt: certificate.IssuedAt,
+	}, nil
 }
 
 func (uc *CertificateUseCase) issueIfEligible(ctx context.Context, userID, courseID, orgID uuid.UUID) error {
@@ -111,8 +147,4 @@ func (uc *CertificateUseCase) issueIfEligible(ctx context.Context, userID, cours
 	now := time.Now()
 	certificate := &entities.Certificate{ID: uuid.New(), UserID: userID, CourseID: courseID, OrgID: orgID, VerificationCode: fmt.Sprintf("MNT-%s", uuid.NewString()[:12]), IssuedAt: now}
 	return uc.certificateRepo.Create(ctx, certificate)
-}
-
-func toCertificateDTO(certificate *entities.Certificate, courseTitle string) dto.CertificateDTO {
-	return dto.CertificateDTO{ID: certificate.ID.String(), CourseID: certificate.CourseID.String(), CourseTitle: courseTitle, VerificationCode: certificate.VerificationCode, IssuedAt: certificate.IssuedAt}
 }

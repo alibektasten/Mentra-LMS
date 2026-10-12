@@ -8,7 +8,6 @@ import { useCertificates } from '@/lib/queries/certificates.queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { API_URL } from '@/lib/api/client'
 
 export default function StudentCertificatesPage() {
   const { org } = useParams<{ org: string }>()
@@ -28,7 +27,7 @@ export default function StudentCertificatesPage() {
       ) : certificates.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {certificates.map((certificate) => {
-            const verificationURL = `${API_URL}/certificates/${certificate.verification_code}`
+            const verificationPath = `/certificates/${certificate.verification_code}`
             return (
               <article key={certificate.id} className="overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-card">
                 <div className="flex items-start justify-between gap-3">
@@ -40,8 +39,8 @@ export default function StudentCertificatesPage() {
                 <p className="mt-2 text-xs text-muted-foreground">Issued {new Date(certificate.issued_at).toLocaleDateString()}</p>
                 <p className="mt-3 font-mono text-[11px] text-muted-foreground">{certificate.verification_code}</p>
                 <div className="mt-4 flex gap-2">
-                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { navigator.clipboard.writeText(verificationURL); toast.success('Verification link copied') }}><Copy className="mr-1 h-3 w-3" />Copy link</Button>
-                  <a href={verificationURL} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-950"><ExternalLink className="mr-1 h-3 w-3" />Verify</a>
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}${verificationPath}`); toast.success('Verification link copied') }}><Copy className="mr-1 h-3 w-3" />Copy link</Button>
+                  <Link href={verificationPath} target="_blank" className="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-950"><ExternalLink className="mr-1 h-3 w-3" />Verify</Link>
                 </div>
               </article>
             )

@@ -117,7 +117,7 @@ func main() {
 	examUC := usecases.NewExamUseCase(examRepo, examAttemptRepo, extraAttemptGrantRepo, courseRepo)
 	teacherUC := usecases.NewTeacherUseCase(courseRepo, groupRepo, courseTeacherRepo, userRepo, assignmentRepo)
 	flashcardDeckUC := usecases.NewFlashcardDeckUseCase(flashcardDeckRepo, lessonRepo)
-	certificateUC := usecases.NewCertificateUseCase(certificateRepo, groupRepo, courseRepo, moduleRepo, lessonRepo, progressRepo)
+	certificateUC := usecases.NewCertificateUseCase(certificateRepo, groupRepo, courseRepo, moduleRepo, lessonRepo, progressRepo, userRepo, orgRepo, courseTeacherRepo)
 	notificationUC := usecases.NewNotificationUseCase(announcementRepo, courseRepo, groupRepo, courseTeacherRepo)
 
 	fileAttachmentUC := usecases.NewFileAttachmentUseCase(fileAttachmentRepo)
