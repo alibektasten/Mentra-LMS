@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { UserRound } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ArrowDownAZ, ArrowUpAZ, CalendarArrowDown, Mail, UserRound } from 'lucide-react'
 import { useAllUsers } from '@/lib/queries/super-admin.queries'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -10,16 +10,30 @@ import { Card, CardContent } from '@/components/ui/card'
 
 export default function SuperAdminUsersPage() {
   const [page, setPage] = useState(1)
+  const [sortBy, setSortBy] = useState<'name' | 'email' | 'created_at'>('created_at')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const pageSize = 20
   const { data, isLoading } = useAllUsers({ page, page_size: pageSize })
 
-  const users = data?.data ?? []
+  const users = useMemo(() => [...(data?.data ?? [])].sort((a, b) => {
+    const aValue = sortBy === 'created_at' ? new Date(a.created_at).getTime() : a[sortBy].toLocaleLowerCase()
+    const bValue = sortBy === 'created_at' ? new Date(b.created_at).getTime() : b[sortBy].toLocaleLowerCase()
+    const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0
+    return sortDirection === 'asc' ? comparison : -comparison
+  }), [data?.data, sortBy, sortDirection])
   const total = data?.meta?.total ?? 0
   const totalPages = Math.ceil(total / pageSize)
+  const changeSort = (field: typeof sortBy) => {
+    if (field === sortBy) setSortDirection((direction) => direction === 'asc' ? 'desc' : 'asc')
+    else { setSortBy(field); setSortDirection(field === 'created_at' ? 'desc' : 'asc') }
+  }
+  const sortIcon = (field: typeof sortBy) => field === sortBy
+    ? (sortDirection === 'asc' ? <ArrowUpAZ className="h-3.5 w-3.5" /> : <ArrowDownAZ className="h-3.5 w-3.5" />)
+    : field === 'created_at' ? <CalendarArrowDown className="h-3.5 w-3.5" /> : field === 'email' ? <Mail className="h-3.5 w-3.5" /> : <ArrowDownAZ className="h-3.5 w-3.5" />
 
   return (
     <div className="space-y-7">
-      <PageHeader title="All Users" description={`${total} total`} />
+      <PageHeader title="All users" description={`${total} accounts across every organisation`} />
       <Card className="sa-card overflow-hidden rounded-2xl border-0">
         <CardContent className="p-0">
           {isLoading ? (
@@ -27,12 +41,17 @@ export default function SuperAdminUsersPage() {
               {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400 dark:border-slate-700 dark:bg-slate-800/60">
-                  <th className="px-5 py-4">Account</th>
-                  <th className="px-5 py-4">Email</th>
-                  <th className="px-5 py-4">Created</th>
+                  {([['name', 'Account'], ['email', 'Email'], ['created_at', 'Created']] as const).map(([field, label]) => (
+                    <th key={field} className="px-5 py-4">
+                      <button onClick={() => changeSort(field)} className="inline-flex items-center gap-1.5 transition hover:text-slate-700 dark:hover:text-white" title={`Sort by ${label.toLowerCase()}`}>
+                        {label} {sortIcon(field)}
+                      </button>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -51,6 +70,7 @@ export default function SuperAdminUsersPage() {
                 )}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

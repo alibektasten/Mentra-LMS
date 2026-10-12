@@ -38,13 +38,18 @@ func CORS() gin.HandlerFunc {
 
 func parseOrigins(raw string) []string {
 	if raw == "" {
-		return []string{"http://localhost:3000"}
+		return []string{"http://localhost:3000", "http://127.0.0.1:3000"}
 	}
 	var out []string
 	for _, o := range strings.Split(raw, ",") {
 		if s := strings.TrimSpace(o); s != "" {
 			out = append(out, s)
 		}
+	}
+	// Local browsers do not treat localhost and 127.0.0.1 as the same origin.
+	// Permit both loopback spellings when either is explicitly configured.
+	if strings.Contains(raw, "http://localhost:3000") && !strings.Contains(raw, "http://127.0.0.1:3000") {
+		out = append(out, "http://127.0.0.1:3000")
 	}
 	return out
 }
