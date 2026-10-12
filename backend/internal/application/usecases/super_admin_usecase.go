@@ -72,8 +72,8 @@ func (uc *SuperAdminUseCase) CreateOrg(ctx context.Context, req dto.CreateOrgani
 	return &dto.OrgDTO{ID: org.ID.String(), Name: org.Name, Slug: org.Slug, CreatedAt: org.CreatedAt}, nil
 }
 
-func (uc *SuperAdminUseCase) ListUsers(ctx context.Context, page, pageSize int) ([]dto.AdminUserDTO, int64, error) {
-	users, total, err := uc.userRepo.ListAll(ctx, page, pageSize)
+func (uc *SuperAdminUseCase) ListUsers(ctx context.Context, filters repositories.SystemUserFilters) ([]dto.AdminUserDTO, int64, error) {
+	users, total, err := uc.userRepo.ListForSystemAdmin(ctx, filters)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -83,6 +83,9 @@ func (uc *SuperAdminUseCase) ListUsers(ctx context.Context, page, pageSize int) 
 			ID:        u.ID.String(),
 			Email:     u.Email,
 			Name:      u.Name,
+			Role:      u.Role,
+			OrgID:     u.OrgID,
+			OrgName:   u.OrgName,
 			CreatedAt: u.CreatedAt,
 		}
 	}

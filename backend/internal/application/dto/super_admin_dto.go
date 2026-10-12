@@ -13,6 +13,9 @@ type AdminUserDTO struct {
 	ID        string    `json:"id"`
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
+	Role      string    `json:"role"`
+	OrgID     string    `json:"org_id"`
+	OrgName   string    `json:"org_name"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

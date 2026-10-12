@@ -6,6 +6,7 @@ import (
 
 	"github.com/ailms/backend/internal/application/dto"
 	"github.com/ailms/backend/internal/application/usecases"
+	"github.com/ailms/backend/internal/domain/repositories"
 	apperrors "github.com/ailms/backend/pkg/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -111,7 +112,12 @@ func (h *SuperAdminHandler) ListUsers(c *gin.Context) {
 		pageSize = 20
 	}
 
-	users, total, err := h.superAdminUC.ListUsers(c.Request.Context(), page, pageSize)
+	filters := repositories.SystemUserFilters{
+		Page: page, PageSize: pageSize,
+		Search: c.Query("search"), Role: c.Query("role"), OrgID: c.Query("org_id"),
+		SortBy: c.DefaultQuery("sort_by", "created_at"), SortOrder: c.DefaultQuery("sort_order", "desc"),
+	}
+	users, total, err := h.superAdminUC.ListUsers(c.Request.Context(), filters)
 	if err != nil {
 		c.Error(err)
 		return

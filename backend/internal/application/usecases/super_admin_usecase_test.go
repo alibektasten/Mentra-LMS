@@ -8,6 +8,7 @@ import (
 
 	"github.com/ailms/backend/internal/application/dto"
 	"github.com/ailms/backend/internal/domain/entities"
+	"github.com/ailms/backend/internal/domain/repositories"
 	"github.com/ailms/backend/internal/mocks"
 	apperrors "github.com/ailms/backend/pkg/errors"
 	"github.com/google/uuid"
@@ -81,17 +82,19 @@ func TestSuperAdminUseCase_ListUsers_Success(t *testing.T) {
 	uc := newSuperAdminUC(userRepo, orgRepo, memberRepo)
 
 	now := time.Now()
-	users := []entities.User{
-		{ID: uuid.New(), Email: "u1@test.com", Name: "User 1", CreatedAt: now},
-		{ID: uuid.New(), Email: "u2@test.com", Name: "User 2", CreatedAt: now},
+	users := []repositories.SystemUser{
+		{ID: uuid.New(), Email: "u1@test.com", Name: "User 1", Role: "student", OrgName: "Test University", CreatedAt: now},
+		{ID: uuid.New(), Email: "u2@test.com", Name: "User 2", Role: "teacher", OrgName: "Test University", CreatedAt: now},
 	}
-	userRepo.On("ListAll", mock.Anything, 1, 20).Return(users, int64(2), nil)
+	filters := repositories.SystemUserFilters{Page: 1, PageSize: 20, SortBy: "created_at", SortOrder: "desc"}
+	userRepo.On("ListForSystemAdmin", mock.Anything, filters).Return(users, int64(2), nil)
 
-	result, total, err := uc.ListUsers(context.Background(), 1, 20)
+	result, total, err := uc.ListUsers(context.Background(), filters)
 	require.NoError(t, err)
 	assert.Len(t, result, 2)
 	assert.Equal(t, int64(2), total)
 	assert.Equal(t, "u1@test.com", result[0].Email)
+	assert.Equal(t, "student", result[0].Role)
 }
 
 func TestSuperAdminUseCase_GetStats_Success(t *testing.T) {

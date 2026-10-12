@@ -2,9 +2,11 @@ package repositories
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/ailms/backend/internal/domain/entities"
+	domainrepos "github.com/ailms/backend/internal/domain/repositories"
 	"github.com/ailms/backend/internal/infrastructure/database"
 	apperrors "github.com/ailms/backend/pkg/errors"
 	"github.com/google/uuid"
@@ -84,6 +86,50 @@ func (r *GORMUserRepository) ListAll(ctx context.Context, page, pageSize int) ([
 		result[i] = *toUserEntity(&m)
 	}
 	return result, count, nil
+}
+
+func (r *GORMUserRepository) ListForSystemAdmin(ctx context.Context, filters domainrepos.SystemUserFilters) ([]domainrepos.SystemUser, int64, error) {
+	query := r.db.WithContext(ctx).
+		Table("users").
+		Select(`users.id, users.email, users.name, COALESCE(NULLIF(memberships.role, ''), NULLIF(users.role, ''), 'unassigned') AS role,
+			COALESCE(memberships.org_id::text, '') AS org_id, COALESCE(organizations.name, 'System') AS org_name, users.created_at`).
+		Joins("LEFT JOIN memberships ON memberships.user_id = users.id").
+		Joins("LEFT JOIN organizations ON organizations.id = memberships.org_id")
+
+	if search := strings.TrimSpace(strings.ToLower(filters.Search)); search != "" {
+		like := "%" + search + "%"
+		query = query.Where("LOWER(users.name) LIKE ? OR LOWER(users.email) LIKE ?", like, like)
+	}
+	if filters.Role != "" {
+		query = query.Where("COALESCE(NULLIF(memberships.role, ''), NULLIF(users.role, ''), 'unassigned') = ?", filters.Role)
+	}
+	if filters.OrgID != "" {
+		query = query.Where("memberships.org_id = ?", filters.OrgID)
+	}
+
+	var total int64
+	if err := query.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, 0, apperrors.InternalError(err.Error())
+	}
+
+	orderColumns := map[string]string{
+		"name": "users.name", "email": "users.email", "role": "role", "org_name": "organizations.name", "created_at": "users.created_at",
+	}
+	orderBy, ok := orderColumns[filters.SortBy]
+	if !ok {
+		orderBy = "users.created_at"
+	}
+	direction := "DESC"
+	if strings.EqualFold(filters.SortOrder, "asc") {
+		direction = "ASC"
+	}
+
+	var rows []domainrepos.SystemUser
+	if err := query.Order(orderBy + " " + direction).Order("users.id ASC").
+		Offset((filters.Page - 1) * filters.PageSize).Limit(filters.PageSize).Scan(&rows).Error; err != nil {
+		return nil, 0, apperrors.InternalError(err.Error())
+	}
+	return rows, total, nil
 }
 
 func (r *GORMUserRepository) FindByIDs(ctx context.Context, ids []uuid.UUID) ([]entities.User, error) {
