@@ -14,6 +14,7 @@ export interface CalendarDeadline {
   courseID: string
   courseTitle: string
   submitted: boolean
+  itemType: 'assignment' | 'quiz' | 'midterm' | 'endterm' | 'final'
 }
 
 interface MiniCalendarProps {
@@ -29,10 +30,10 @@ export function MiniCalendar({ progress, deadlines = [] }: MiniCalendarProps) {
   const { locale } = useI18n()
   const languageTag = locale === 'kk' ? 'kk-KZ' : locale === 'ru' ? 'ru-RU' : 'en-US'
   const copy = locale === 'ru'
-    ? { activity: 'Активность', today: 'Сегодня', completed: 'Завершено уроков', noEvents: 'На эту дату событий нет', open: 'Открыть курс' }
+    ? { activity: 'Активность', today: 'Сегодня', completed: 'Завершено уроков', noEvents: 'На эту дату событий нет', open: 'Открыть курс', assignment: 'Задание', quiz: 'Тест', midterm: 'Рубежный контроль', endterm: 'Конец семестра', final: 'Финальный экзамен', submitted: 'Сдано' }
     : locale === 'kk'
-      ? { activity: 'Белсенділік', today: 'Бүгін', completed: 'Аяқталған сабақтар', noEvents: 'Бұл күні оқиғалар жоқ', open: 'Курсты ашу' }
-      : { activity: 'Activity', today: 'Today', completed: 'Lessons completed', noEvents: 'No events on this date', open: 'Open course' }
+      ? { activity: 'Белсенділік', today: 'Бүгін', completed: 'Аяқталған сабақтар', noEvents: 'Бұл күні оқиғалар жоқ', open: 'Курсты ашу', assignment: 'Тапсырма', quiz: 'Тест', midterm: 'Аралық бақылау', endterm: 'Семестр соңы', final: 'Қорытынды емтихан', submitted: 'Тапсырылды' }
+      : { activity: 'Activity', today: 'Today', completed: 'Lessons completed', noEvents: 'No events on this date', open: 'Open course', assignment: 'Assignment', quiz: 'Quiz', midterm: 'Midterm', endterm: 'Endterm', final: 'Final exam', submitted: 'Submitted' }
   const today = new Date()
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [selectedKey, setSelectedKey] = useState(dateKey(today))
@@ -100,7 +101,11 @@ export function MiniCalendar({ progress, deadlines = [] }: MiniCalendarProps) {
         <p className="text-[11px] font-semibold text-[#55554f]">{selectedLabel}</p>
         {selectedActivity.length === 0 && selectedDeadlines.length === 0 ? <p className="mt-1 text-xs text-[#9b9b9b]">{copy.noEvents}</p> : <div className="mt-2 space-y-2">
           {selectedActivity.length > 0 && <div className="flex items-center gap-2 text-xs text-[#4d4d47]"><CircleDot className="h-3.5 w-3.5 text-emerald-600" />{selectedActivity.length} {copy.completed.toLowerCase()}</div>}
-          {selectedDeadlines.map((deadline) => <button key={deadline.id} onClick={() => router.push(`/${org}/student/courses/${deadline.courseID}`)} className="flex w-full items-start gap-2 rounded-lg bg-orange-50 px-2.5 py-2 text-left hover:bg-orange-100"><ListChecks className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-600" /><span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold text-[#4b3824]">{deadline.title}</span><span className="block truncate text-[10px] text-orange-700">{deadline.courseTitle} · {copy.open}</span></span></button>)}
+          {selectedDeadlines.map((deadline) => {
+            const label = copy[deadline.itemType]
+            const isExam = deadline.itemType === 'midterm' || deadline.itemType === 'endterm' || deadline.itemType === 'final'
+            return <button key={deadline.id} onClick={() => router.push(`/${org}/student/courses/${deadline.courseID}`)} className={cn('flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left', isExam ? 'bg-violet-50 hover:bg-violet-100' : 'bg-orange-50 hover:bg-orange-100')}><ListChecks className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', isExam ? 'text-violet-600' : 'text-orange-600')} /><span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold text-[#4b3824]">{deadline.title}</span><span className={cn('block truncate text-[10px]', isExam ? 'text-violet-700' : 'text-orange-700')}>{label} · {deadline.courseTitle}{deadline.submitted ? ` · ${copy.submitted}` : ''}</span></span></button>
+          })}
         </div>}
       </div>
     </section>

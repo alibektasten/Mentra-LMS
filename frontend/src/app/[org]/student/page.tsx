@@ -40,6 +40,7 @@ export default function StudentDashboard() {
       courseID: course.id,
       courseTitle: course.title,
       submitted: deadline.submitted,
+      itemType: deadline.item_type,
     }))
   }), [deadlineQueries, publishedCourses])
 
