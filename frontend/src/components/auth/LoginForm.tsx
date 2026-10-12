@@ -26,7 +26,7 @@ export function LoginForm({ orgSlug, returnTo, isSuperAdmin }: LoginFormProps) {
   const [googleEnabled, setGoogleEnabled] = useState(false)
 
   useEffect(() => {
-    if (isSuperAdmin || !orgSlug) return
+	if (!orgSlug && !isSuperAdmin) return
     getGoogleOAuthStatus().then(setGoogleEnabled).catch(() => setGoogleEnabled(false))
   }, [isSuperAdmin, orgSlug])
 
@@ -75,15 +75,13 @@ export function LoginForm({ orgSlug, returnTo, isSuperAdmin }: LoginFormProps) {
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? 'Signing in...' : 'Sign in'}
       </Button>
-      {!isSuperAdmin && (
-        <div className="space-y-3 pt-1">
+      <div className="space-y-3 pt-1">
           <div className="flex items-center gap-3"><div className="h-px flex-1 bg-border" /><span className="text-[11px] text-muted-foreground">or</span><div className="h-px flex-1 bg-border" /></div>
-          <Button type="button" variant="outline" className="w-full" disabled={!googleEnabled} onClick={() => { window.location.assign(getGoogleOAuthStartURL(orgSlug)) }}>
+          <Button type="button" variant="outline" className="w-full" disabled={!googleEnabled} onClick={() => { window.location.assign(getGoogleOAuthStartURL(orgSlug, Boolean(isSuperAdmin))) }}>
             <Chrome className="mr-2 h-4 w-4" />Continue with Google
           </Button>
           {!googleEnabled && <p className="text-center text-xs text-muted-foreground">Google sign-in will be available after the organization adds its OAuth credentials.</p>}
-        </div>
-      )}
+	      </div>
     </form>
   )
 }

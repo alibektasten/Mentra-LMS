@@ -65,8 +65,11 @@ export async function getGoogleOAuthStatus(): Promise<boolean> {
   return res.data.data?.enabled ?? false
 }
 
-export function getGoogleOAuthStartURL(orgSlug: string): string {
-  return `${API_URL}/auth/google/start?org=${encodeURIComponent(orgSlug)}`
+export function getGoogleOAuthStartURL(orgSlug?: string, isSuperAdmin = false): string {
+	const query = isSuperAdmin
+		? 'mode=super_admin'
+		: `org=${encodeURIComponent(orgSlug ?? '')}`
+	return `${API_URL}/auth/google/start?${query}`
 }
 
 // Raw axios (no interceptor) for auth calls to avoid circular re-auth loops

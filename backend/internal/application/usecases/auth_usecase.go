@@ -132,6 +132,19 @@ func (uc *AuthUseCase) LoginWithOAuth(ctx context.Context, email, orgSlug string
 	return uc.generateToken(user, org.ID, role)
 }
 
+// SuperAdminLoginWithOAuth grants platform access only to an existing
+// super-admin account whose verified Google email matches its LMS email.
+func (uc *AuthUseCase) SuperAdminLoginWithOAuth(ctx context.Context, email string) (*dto.TokenResponse, error) {
+	user, err := uc.userRepo.FindByEmail(ctx, email)
+	if err != nil {
+		return nil, apperrors.UnauthorizedError("this Google account is not registered")
+	}
+	if user.Role != string(entities.RoleSuperAdmin) {
+		return nil, apperrors.ForbiddenError("not a super admin")
+	}
+	return uc.generateToken(user, uuid.Nil, entities.RoleSuperAdmin)
+}
+
 func (uc *AuthUseCase) SuperAdminLogin(ctx context.Context, req dto.LoginRequest) (*dto.TokenResponse, error) {
 	user, err := uc.userRepo.FindByEmail(ctx, req.Email)
 	if err != nil {

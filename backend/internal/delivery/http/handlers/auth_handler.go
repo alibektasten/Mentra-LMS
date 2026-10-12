@@ -81,11 +81,13 @@ func (h *AuthHandler) GoogleStart(c *gin.Context) {
 		return
 	}
 	orgSlug := strings.TrimSpace(c.Query("org"))
-	if orgSlug == "" {
+	mode := strings.TrimSpace(c.Query("mode"))
+	isSuperAdmin := mode == "super_admin"
+	if orgSlug == "" && !isSuperAdmin {
 		c.Error(apperrors.ValidationError("organization is required"))
 		return
 	}
-	state, err := h.createGoogleState(orgSlug)
+	state, err := h.createGoogleState(orgSlug, isSuperAdmin)
 	if err != nil {
 		c.Error(err)
 		return
@@ -113,7 +115,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		c.Error(apperrors.UnauthorizedError("invalid OAuth state"))
 		return
 	}
-	orgSlug, err := h.verifyGoogleState(state)
+	stateData, err := h.verifyGoogleState(state)
 	if err != nil {
 		c.Error(err)
 		return
@@ -128,7 +130,12 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	response, err := h.authUC.LoginWithOAuth(c.Request.Context(), email, orgSlug)
+	var response *dto.TokenResponse
+	if stateData.SuperAdmin {
+		response, err = h.authUC.SuperAdminLoginWithOAuth(c.Request.Context(), email)
+	} else {
+		response, err = h.authUC.LoginWithOAuth(c.Request.Context(), email, stateData.Org)
+	}
 	if err != nil {
 		c.Error(err)
 		return
@@ -140,7 +147,11 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	}
 	c.SetCookie("mentra_google_oauth_state", "", -1, "/", "", false, true)
 	frontendURL := strings.TrimRight(h.googleOAuth.FrontendURL, "/")
-	redirectURL := fmt.Sprintf("%s/%s/login#oauth=%s", frontendURL, url.PathEscape(orgSlug), base64.RawURLEncoding.EncodeToString(payload))
+	loginPath := "/login"
+	if !stateData.SuperAdmin {
+		loginPath = fmt.Sprintf("/%s/login", url.PathEscape(stateData.Org))
+	}
+	redirectURL := fmt.Sprintf("%s%s#oauth=%s", frontendURL, loginPath, base64.RawURLEncoding.EncodeToString(payload))
 	c.Redirect(http.StatusFound, redirectURL)
 }
 
@@ -148,11 +159,12 @@ func (h *AuthHandler) googleEnabled() bool {
 	return h.googleOAuth.ClientID != "" && h.googleOAuth.ClientSecret != ""
 }
 
-func (h *AuthHandler) createGoogleState(orgSlug string) (string, error) {
+func (h *AuthHandler) createGoogleState(orgSlug string, superAdmin bool) (string, error) {
 	payload, err := json.Marshal(struct {
-		Org string `json:"org"`
-		Exp int64  `json:"exp"`
-	}{Org: orgSlug, Exp: time.Now().Add(10 * time.Minute).Unix()})
+		Org        string `json:"org"`
+		SuperAdmin bool   `json:"super_admin"`
+		Exp        int64  `json:"exp"`
+	}{Org: orgSlug, SuperAdmin: superAdmin, Exp: time.Now().Add(10 * time.Minute).Unix()})
 	if err != nil {
 		return "", apperrors.InternalError("failed to prepare OAuth state")
 	}
@@ -162,29 +174,39 @@ func (h *AuthHandler) createGoogleState(orgSlug string) (string, error) {
 	return encoded + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
-func (h *AuthHandler) verifyGoogleState(state string) (string, error) {
+func (h *AuthHandler) verifyGoogleState(state string) (struct {
+	Org        string `json:"org"`
+	SuperAdmin bool   `json:"super_admin"`
+	Exp        int64  `json:"exp"`
+}, error) {
+	var empty struct {
+		Org        string `json:"org"`
+		SuperAdmin bool   `json:"super_admin"`
+		Exp        int64  `json:"exp"`
+	}
 	parts := strings.Split(state, ".")
 	if len(parts) != 2 {
-		return "", apperrors.UnauthorizedError("invalid OAuth state")
+		return empty, apperrors.UnauthorizedError("invalid OAuth state")
 	}
 	mac := hmac.New(sha256.New, []byte(h.stateSecret))
 	_, _ = mac.Write([]byte(parts[0]))
 	expected := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 	if subtle.ConstantTimeCompare([]byte(expected), []byte(parts[1])) != 1 {
-		return "", apperrors.UnauthorizedError("invalid OAuth state")
+		return empty, apperrors.UnauthorizedError("invalid OAuth state")
 	}
 	decoded, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return "", apperrors.UnauthorizedError("invalid OAuth state")
+		return empty, apperrors.UnauthorizedError("invalid OAuth state")
 	}
 	var payload struct {
-		Org string `json:"org"`
-		Exp int64  `json:"exp"`
+		Org        string `json:"org"`
+		SuperAdmin bool   `json:"super_admin"`
+		Exp        int64  `json:"exp"`
 	}
-	if err := json.Unmarshal(decoded, &payload); err != nil || payload.Org == "" || time.Now().Unix() > payload.Exp {
-		return "", apperrors.UnauthorizedError("expired OAuth state")
+	if err := json.Unmarshal(decoded, &payload); err != nil || (!payload.SuperAdmin && payload.Org == "") || time.Now().Unix() > payload.Exp {
+		return empty, apperrors.UnauthorizedError("expired OAuth state")
 	}
-	return payload.Org, nil
+	return payload, nil
 }
 
 func (h *AuthHandler) googleEmail(ctx context.Context, code string) (string, error) {
