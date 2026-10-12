@@ -40,9 +40,9 @@ export function MyGrades({ courseId }: MyGradesProps) {
       <div className="rounded-xl border bg-surface-50 p-4 sm:p-5">
         <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-ink-muted">{t('overallGrade')}</p>
+          <p className="text-sm text-ink-muted">Final grade (weighted)</p>
           <p className="text-2xl font-bold text-ink">{data.percentage.toFixed(1)}%</p>
-          <p className="text-xs text-ink-subtle">{data.total_earned} / {data.total_possible} pts</p>
+          <p className="text-xs text-ink-subtle">Assignments, midterm, endterm, and final exam</p>
         </div>
         <div className="text-4xl font-bold text-accent">{letter}</div>
         </div>
@@ -50,6 +50,21 @@ export function MyGrades({ courseId }: MyGradesProps) {
           <div><p className="font-semibold text-emerald-700">{gradedCount}</p><p className="mt-0.5 text-ink-subtle">Graded</p></div>
           <div><p className="font-semibold text-amber-700">{submittedCount}</p><p className="mt-0.5 text-ink-subtle">In review</p></div>
           <div><p className="font-semibold text-slate-600">{data.items.length - gradedCount - submittedCount}</p><p className="mt-0.5 text-ink-subtle">Not submitted</p></div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <RegisterCard title="Midterm register" value={data.midterm_register} detail="50% assignments + 50% midterm" />
+        <RegisterCard title="Endterm register" value={data.endterm_register} detail="50% assignments + 50% endterm" />
+      </div>
+
+      <div className="rounded-xl border border-[#e4e2de] bg-white p-4">
+        <div className="flex items-center justify-between"><div><p className="font-semibold text-[#1a1a1a]">Assessment formula</p><p className="mt-0.5 text-xs text-[#85847e]">The weighted grade is calculated automatically as results are published.</p></div><span className={data.is_final_grade_ready ? 'rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700' : 'rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700'}>{data.is_final_grade_ready ? 'Complete' : 'In progress'}</span></div>
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <FormulaPart label="Assignments" weight="25%" value={data.assignments_percent} />
+          <FormulaPart label="Midterm" weight="12.5%" value={data.midterm_percent} />
+          <FormulaPart label="Endterm" weight="12.5%" value={data.endterm_percent} />
+          <FormulaPart label="Final" weight="50%" value={data.final_exam_percent} />
         </div>
       </div>
 
@@ -68,7 +83,7 @@ export function MyGrades({ courseId }: MyGradesProps) {
             <div className="min-w-0 flex-1"><span className="block text-sm font-medium text-ink">{item.title}</span>{item.graded_at && <span className="mt-0.5 block text-xs text-ink-subtle">Graded {new Date(item.graded_at).toLocaleDateString()}</span>}</div>
             <span className={cn(
               'text-xs px-2 py-0.5 rounded capitalize',
-              item.item_type === 'assignment' ? 'text-amber-700 bg-amber-50' : 'text-purple-700 bg-purple-50'
+              item.item_type === 'assignment' ? 'text-amber-700 bg-amber-50' : item.item_type === 'final' ? 'text-rose-700 bg-rose-50' : 'text-purple-700 bg-purple-50'
             )}>
               {item.item_type}
             </span>
@@ -91,4 +106,12 @@ export function MyGrades({ courseId }: MyGradesProps) {
       </div>
     </div>
   )
+}
+
+function RegisterCard({ title, value, detail }: { title: string; value: number | null; detail: string }) {
+  return <div className="rounded-xl border border-[#e4e2de] bg-white p-4"><p className="text-sm font-semibold text-[#252520]">{title}</p><p className="mt-2 text-2xl font-bold text-emerald-700">{value === null ? '—' : `${value.toFixed(1)}%`}</p><p className="mt-1 text-xs text-[#85847e]">{detail}</p></div>
+}
+
+function FormulaPart({ label, weight, value }: { label: string; weight: string; value: number | null }) {
+  return <div className="rounded-lg bg-[#fafaf8] p-3"><p className="text-xs font-semibold text-[#4b4a45]">{label}</p><p className="mt-1 text-lg font-bold text-[#20201d]">{value === null ? '—' : `${value.toFixed(0)}%`}</p><p className="mt-0.5 text-xs text-[#888780]">Weight {weight}</p></div>
 }

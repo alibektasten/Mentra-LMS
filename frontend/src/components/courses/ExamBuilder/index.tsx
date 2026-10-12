@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { Plus, GraduationCap, Clock, Star, Pencil, Trash2, Users } from 'lucide-react'
+import { Plus, GraduationCap, Clock, Star, Pencil, Trash2, Users, CheckCircle2, Circle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useExams, useDeleteExam } from '@/lib/queries/exams.queries'
 import { ExamListItemDTO } from '@/types/exam'
@@ -58,6 +58,11 @@ export function ExamBuilder({ courseId }: ExamBuilderProps) {
   }
 
   const examList = exams ?? []
+  const requiredAssessments = [
+    { type: 'midterm', label: 'Midterm', weight: '12.5%' },
+    { type: 'endterm', label: 'Endterm', weight: '12.5%' },
+    { type: 'final', label: 'Final exam', weight: '50%' },
+  ]
 
   return (
     <div className="space-y-4">
@@ -81,6 +86,17 @@ export function ExamBuilder({ courseId }: ExamBuilderProps) {
         </Button>
       </div>
 
+      <div className="rounded-xl border border-[#e4e2de] bg-[#fafaf8] p-4">
+        <p className="text-sm font-semibold text-[#1a1a1a]">Required assessment plan</p>
+        <p className="mt-1 text-xs text-[#77766f]">Assignments contribute 25% of the final grade. Add each required exam to complete the course schedule.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {requiredAssessments.map((item) => {
+            const exists = examList.some((exam) => exam.assessment_type === item.type)
+            return <div key={item.type} className="flex items-center gap-2 rounded-lg border border-[#e7e6e0] bg-white px-3 py-2 text-xs"><span className={exists ? 'text-emerald-600' : 'text-[#aaa9a2]'}>{exists ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}</span><span className="font-semibold text-[#45453f]">{item.label}</span><span className="ml-auto text-[#888780]">{item.weight}</span></div>
+          })}
+        </div>
+      </div>
+
       {examList.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-14 rounded-xl border border-dashed border-[#e4e2de]">
           <GraduationCap className="h-8 w-8 text-[#d4d2ce] mb-2" />
@@ -99,6 +115,7 @@ export function ExamBuilder({ courseId }: ExamBuilderProps) {
                   <p className="text-sm font-semibold text-[#1a1a1a] truncate">{exam.title}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[#9b9b9b]">
                     <span className="flex items-center gap-1">
+					  {exam.assessment_type !== 'other' && <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 capitalize">{exam.assessment_type}</span>}
                       <Clock className="h-3 w-3" />
                       {exam.duration_minutes} min
                     </span>

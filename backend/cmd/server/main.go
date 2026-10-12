@@ -111,7 +111,7 @@ func main() {
 	superAdminUC := usecases.NewSuperAdminUseCase(userRepo, orgRepo, memberRepo)
 	assignmentUC := usecases.NewAssignmentUseCase(assignmentRepo, moduleRepo, userRepo)
 	quizAttemptUC := usecases.NewQuizAttemptUseCase(quizAttemptRepo, quizRepo, lessonRepo, aiService)
-	gradeUC := usecases.NewGradeUseCase(assignmentRepo, quizAttemptRepo, quizRepo, memberRepo)
+	gradeUC := usecases.NewGradeUseCase(assignmentRepo, quizAttemptRepo, quizRepo, memberRepo, examRepo, examAttemptRepo)
 	announcementUC := usecases.NewAnnouncementUseCase(announcementRepo, courseRepo)
 	groupUC := usecases.NewGroupUseCase(groupRepo, courseRepo)
 	examUC := usecases.NewExamUseCase(examRepo, examAttemptRepo, extraAttemptGrantRepo, courseRepo)

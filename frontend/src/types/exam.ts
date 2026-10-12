@@ -15,6 +15,7 @@ export interface ExamDTO {
   id: string
   course_id: string
   org_id: string
+  assessment_type: 'midterm' | 'endterm' | 'final' | 'other'
   title: string
   description: string
   duration_minutes: number
@@ -34,6 +35,7 @@ export interface ExamListItemDTO {
   id: string
   course_id: string
   org_id: string
+  assessment_type: 'midterm' | 'endterm' | 'final' | 'other'
   title: string
   description: string
   duration_minutes: number
@@ -93,6 +95,7 @@ export interface CreateExamQuestionInput {
 }
 
 export interface CreateExamInput {
+  assessment_type?: 'midterm' | 'endterm' | 'final' | 'other'
   title: string
   description?: string
   duration_minutes: number
@@ -106,6 +109,7 @@ export interface CreateExamInput {
 }
 
 export interface UpdateExamInput {
+  assessment_type?: 'midterm' | 'endterm' | 'final' | 'other'
   title?: string
   description?: string
   duration_minutes?: number

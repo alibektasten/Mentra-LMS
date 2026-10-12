@@ -252,6 +252,7 @@ type ExamModel struct {
 	ID              string `gorm:"type:uuid;primaryKey"`
 	CourseID        string `gorm:"type:uuid;index;not null"`
 	OrgID           string `gorm:"type:uuid;index;not null"`
+	AssessmentType  string `gorm:"not null;default:other;index"`
 	Title           string `gorm:"not null"`
 	Description     string `gorm:"type:text"`
 	DurationMinutes int    `gorm:"not null;default:60"`

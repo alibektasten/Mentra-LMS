@@ -15,11 +15,19 @@ type GradeItemDTO struct {
 }
 
 type StudentGradeDTO struct {
-	StudentID     string         `json:"student_id"`
-	Items         []GradeItemDTO `json:"items"`
-	TotalEarned   int            `json:"total_earned"`
-	TotalPossible int            `json:"total_possible"`
-	Percentage    float64        `json:"percentage"`
+	StudentID          string         `json:"student_id"`
+	Items              []GradeItemDTO `json:"items"`
+	TotalEarned        int            `json:"total_earned"`
+	TotalPossible      int            `json:"total_possible"`
+	Percentage         float64        `json:"percentage"`
+	AssignmentsPercent *float64       `json:"assignments_percent"`
+	MidtermPercent     *float64       `json:"midterm_percent"`
+	EndtermPercent     *float64       `json:"endterm_percent"`
+	FinalExamPercent   *float64       `json:"final_exam_percent"`
+	MidtermRegister    *float64       `json:"midterm_register"`
+	EndtermRegister    *float64       `json:"endterm_register"`
+	FinalGrade         float64        `json:"final_grade"`
+	IsFinalGradeReady  bool           `json:"is_final_grade_ready"`
 }
 
 type DeadlineItemDTO struct {

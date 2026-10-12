@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/ailms/backend/internal/application/dto"
@@ -40,6 +41,21 @@ func (uc *ExamUseCase) CreateExam(ctx context.Context, courseID, orgID uuid.UUID
 	if !req.MCQEnabled && !req.FileEnabled {
 		return nil, apperrors.ValidationError("at least one section (MCQ or file upload) must be enabled")
 	}
+	assessmentType, err := normalizeAssessmentType(req.AssessmentType)
+	if err != nil {
+		return nil, err
+	}
+	if assessmentType != "other" {
+		exams, err := uc.examRepo.FindByCourse(ctx, courseID, orgID)
+		if err != nil {
+			return nil, err
+		}
+		for _, existing := range exams {
+			if existing.AssessmentType == assessmentType {
+				return nil, apperrors.ValidationError("this course already has a " + assessmentType + " exam")
+			}
+		}
+	}
 
 	if req.MCQEnabled && len(req.Questions) == 0 {
 		return nil, apperrors.ValidationError("MCQ section requires at least 1 question")
@@ -56,6 +72,7 @@ func (uc *ExamUseCase) CreateExam(ctx context.Context, courseID, orgID uuid.UUID
 		ID:              uuid.New(),
 		CourseID:        courseID,
 		OrgID:           orgID,
+		AssessmentType:  assessmentType,
 		Title:           req.Title,
 		Description:     req.Description,
 		DurationMinutes: req.DurationMinutes,
@@ -104,6 +121,24 @@ func (uc *ExamUseCase) UpdateExam(ctx context.Context, id, orgID uuid.UUID, req 
 
 	if req.Title != nil {
 		existing.Title = *req.Title
+	}
+	if req.AssessmentType != nil {
+		assessmentType, err := normalizeAssessmentType(*req.AssessmentType)
+		if err != nil {
+			return nil, err
+		}
+		if assessmentType != "other" && assessmentType != existing.AssessmentType {
+			exams, err := uc.examRepo.FindByCourse(ctx, existing.CourseID, orgID)
+			if err != nil {
+				return nil, err
+			}
+			for _, exam := range exams {
+				if exam.ID != existing.ID && exam.AssessmentType == assessmentType {
+					return nil, apperrors.ValidationError("this course already has a " + assessmentType + " exam")
+				}
+			}
+		}
+		existing.AssessmentType = assessmentType
 	}
 	if req.Description != nil {
 		existing.Description = *req.Description
@@ -154,6 +189,19 @@ func (uc *ExamUseCase) UpdateExam(ctx context.Context, id, orgID uuid.UUID, req 
 
 func (uc *ExamUseCase) DeleteExam(ctx context.Context, id, orgID uuid.UUID) error {
 	return uc.examRepo.Delete(ctx, id, orgID)
+}
+
+func normalizeAssessmentType(value string) (string, error) {
+	assessmentType := strings.ToLower(strings.TrimSpace(value))
+	if assessmentType == "" {
+		return "other", nil
+	}
+	switch assessmentType {
+	case "midterm", "endterm", "final", "other":
+		return assessmentType, nil
+	default:
+		return "", apperrors.ValidationError("assessment type must be midterm, endterm, final, or other")
+	}
 }
 
 func (uc *ExamUseCase) StartAttempt(ctx context.Context, examID, studentID, orgID uuid.UUID) (*dto.StartAttemptResponse, error) {
@@ -475,6 +523,7 @@ func toExamDTO(e *entities.Exam, withCorrect bool) *dto.ExamDTO {
 		ID:              e.ID.String(),
 		CourseID:        e.CourseID.String(),
 		OrgID:           e.OrgID.String(),
+		AssessmentType:  e.AssessmentType,
 		Title:           e.Title,
 		Description:     e.Description,
 		DurationMinutes: e.DurationMinutes,
@@ -496,6 +545,7 @@ func toExamListItemDTO(e *entities.Exam) *dto.ExamListItemDTO {
 		ID:              e.ID.String(),
 		CourseID:        e.CourseID.String(),
 		OrgID:           e.OrgID.String(),
+		AssessmentType:  e.AssessmentType,
 		Title:           e.Title,
 		Description:     e.Description,
 		DurationMinutes: e.DurationMinutes,

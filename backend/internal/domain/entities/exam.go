@@ -10,6 +10,7 @@ type Exam struct {
 	ID              uuid.UUID
 	CourseID        uuid.UUID
 	OrgID           uuid.UUID
+	AssessmentType  string
 	Title           string
 	Description     string
 	DurationMinutes int

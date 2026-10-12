@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { useCreateExam, useUpdateExam } from '@/lib/queries/exams.queries'
@@ -45,6 +46,7 @@ export function ExamFormDialog({ courseId, open, onOpenChange, editExam }: ExamF
   const updateExam = useUpdateExam(courseId)
 
   const [title, setTitle] = useState('')
+  const [assessmentType, setAssessmentType] = useState<'midterm' | 'endterm' | 'final' | 'other'>('midterm')
   const [description, setDescription] = useState('')
   const [durationMinutes, setDurationMinutes] = useState(60)
   const [maxAttempts, setMaxAttempts] = useState(1)
@@ -59,6 +61,7 @@ export function ExamFormDialog({ courseId, open, onOpenChange, editExam }: ExamF
     if (open) {
       if (editExam) {
         setTitle(editExam.title)
+        setAssessmentType(editExam.assessment_type ?? 'other')
         setDescription(editExam.description || '')
         setDurationMinutes(editExam.duration_minutes)
         setMaxAttempts(editExam.max_attempts)
@@ -70,6 +73,7 @@ export function ExamFormDialog({ courseId, open, onOpenChange, editExam }: ExamF
         setQuestions([emptyQuestion(0)])
       } else {
         setTitle('')
+        setAssessmentType('midterm')
         setDescription('')
         setDurationMinutes(60)
         setMaxAttempts(1)
@@ -134,6 +138,7 @@ export function ExamFormDialog({ courseId, open, onOpenChange, editExam }: ExamF
       : []
 
     const payload = {
+		assessment_type: assessmentType,
       title: title.trim(),
       description: description.trim(),
       duration_minutes: durationMinutes,
@@ -171,6 +176,19 @@ export function ExamFormDialog({ courseId, open, onOpenChange, editExam }: ExamF
 
         <div className="space-y-4 py-2">
           {/* Title */}
+          <div className="space-y-1.5">
+            <Label>Assessment type <span className="text-destructive">*</span></Label>
+            <Select value={assessmentType} onValueChange={(value) => setAssessmentType(value as typeof assessmentType)}>
+              <SelectTrigger className="border-[#e4e2de]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="midterm">Midterm - 12.5% of final grade</SelectItem>
+                <SelectItem value="endterm">Endterm - 12.5% of final grade</SelectItem>
+                <SelectItem value="final">Final exam - 50% of final grade</SelectItem>
+                <SelectItem value="other">Other assessment</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-[#9b9b9b]">Each course can have one midterm, one endterm, and one final exam.</p>
+          </div>
           <div className="space-y-1.5">
             <Label>Title <span className="text-destructive">*</span></Label>
             <Input

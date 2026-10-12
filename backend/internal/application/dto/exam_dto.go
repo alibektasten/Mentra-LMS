@@ -14,6 +14,7 @@ type CreateExamAnswerRequest struct {
 }
 
 type CreateExamRequest struct {
+	AssessmentType  string                      `json:"assessment_type"`
 	Title           string                      `json:"title" binding:"required"`
 	Description     string                      `json:"description"`
 	DurationMinutes int                         `json:"duration_minutes" binding:"required,min=1"`
@@ -27,6 +28,7 @@ type CreateExamRequest struct {
 }
 
 type UpdateExamRequest struct {
+	AssessmentType  *string                     `json:"assessment_type"`
 	Title           *string                     `json:"title"`
 	Description     *string                     `json:"description"`
 	DurationMinutes *int                        `json:"duration_minutes"`
@@ -56,6 +58,7 @@ type ExamDTO struct {
 	ID              string            `json:"id"`
 	CourseID        string            `json:"course_id"`
 	OrgID           string            `json:"org_id"`
+	AssessmentType  string            `json:"assessment_type"`
 	Title           string            `json:"title"`
 	Description     string            `json:"description"`
 	DurationMinutes int               `json:"duration_minutes"`
@@ -75,6 +78,7 @@ type ExamListItemDTO struct {
 	ID              string     `json:"id"`
 	CourseID        string     `json:"course_id"`
 	OrgID           string     `json:"org_id"`
+	AssessmentType  string     `json:"assessment_type"`
 	Title           string     `json:"title"`
 	Description     string     `json:"description"`
 	DurationMinutes int        `json:"duration_minutes"`
