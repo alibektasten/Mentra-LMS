@@ -3,12 +3,15 @@
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import QRCode from 'qrcode'
 import {
   ArrowLeft,
   Award,
   BadgeCheck,
   Building2,
   CalendarDays,
+  Download,
   GraduationCap,
   Loader2,
   ShieldCheck,
@@ -25,12 +28,61 @@ function formatDate(value: string) {
 export default function CertificateVerificationPage() {
   const { code } = useParams<{ code: string }>()
   const certificateCode = Array.isArray(code) ? code[0] : code
+  const certificateRef = useRef<HTMLElement>(null)
+  const [qrCode, setQrCode] = useState('')
+  const [isDownloading, setIsDownloading] = useState(false)
   const { data: certificate, isLoading, isError } = useQuery({
     queryKey: ['certificate-verification', certificateCode],
     queryFn: () => verifyCertificate(certificateCode),
     enabled: Boolean(certificateCode),
     retry: false,
   })
+
+  useEffect(() => {
+    if (!certificateCode) return
+    QRCode.toDataURL(`${window.location.origin}/certificates/${certificateCode}`, {
+      width: 220,
+      margin: 1,
+      color: { dark: '#07553d', light: '#ffffff' },
+    }).then(setQrCode).catch(() => setQrCode(''))
+  }, [certificateCode])
+
+  async function downloadPDF() {
+    if (!certificateRef.current || !certificate) return
+    setIsDownloading(true)
+    const node = certificateRef.current
+    const originalStyle = {
+      width: node.style.width,
+      minWidth: node.style.minWidth,
+      maxWidth: node.style.maxWidth,
+    }
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'), import('jspdf'),
+      ])
+      // Render at a fixed desktop width so the exported certificate always fills landscape A4.
+      node.style.width = '1120px'
+      node.style.minWidth = '1120px'
+      node.style.maxWidth = 'none'
+      const canvas = await html2canvas(node, {
+        backgroundColor: '#ffffff', scale: 2, useCORS: true, logging: false,
+      })
+      const image = canvas.toDataURL('image/png')
+      const document = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      const pageWidth = document.internal.pageSize.getWidth()
+      const pageHeight = document.internal.pageSize.getHeight()
+      const scale = Math.min(pageWidth / canvas.width, pageHeight / canvas.height)
+      const width = canvas.width * scale
+      const height = canvas.height * scale
+      document.addImage(image, 'PNG', (pageWidth - width) / 2, (pageHeight - height) / 2, width, height)
+      document.save(`Mentra-certificate-${certificate.verification_code}.pdf`)
+    } finally {
+      node.style.width = originalStyle.width
+      node.style.minWidth = originalStyle.minWidth
+      node.style.maxWidth = originalStyle.maxWidth
+      setIsDownloading(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -56,12 +108,15 @@ export default function CertificateVerificationPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-[#f2f7f3] px-4 py-8 text-slate-900 sm:px-8 sm:py-12">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-7 flex items-center justify-between px-1 sm:mb-9">
+        <header className="mb-7 flex flex-wrap items-center justify-between gap-3 px-1 sm:mb-9">
           <Link href="/login" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-emerald-700"><ArrowLeft className="h-4 w-4" />Mentra LMS</Link>
-          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800"><BadgeCheck className="h-4 w-4" />Verified credential</span>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800"><BadgeCheck className="h-4 w-4" />Verified credential</span>
+            <button onClick={downloadPDF} disabled={isDownloading} className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-3.5 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-70"><Download className="h-4 w-4" />{isDownloading ? 'Preparing PDF…' : 'Download PDF'}</button>
+          </div>
         </header>
 
-        <article className="relative overflow-hidden rounded-[30px] border border-emerald-950/10 bg-white p-3 shadow-[0_28px_80px_-34px_rgba(15,80,54,0.35)] sm:p-5">
+        <article ref={certificateRef} className="relative overflow-hidden rounded-[30px] border border-emerald-950/10 bg-white p-3 shadow-[0_28px_80px_-34px_rgba(15,80,54,0.35)] sm:p-5">
           <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-emerald-100/70 blur-3xl" />
           <div className="absolute -bottom-28 -left-24 h-64 w-64 rounded-full bg-amber-100/60 blur-3xl" />
           <div className="relative border border-emerald-800/25 px-6 py-9 sm:px-12 sm:py-12 lg:px-20 lg:py-16">
@@ -96,8 +151,8 @@ export default function CertificateVerificationPage() {
                 <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Digital signature</p>
               </div>
               <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left text-emerald-900">
-                <ShieldCheck className="h-8 w-8 shrink-0 text-emerald-700" />
-                <div><p className="text-xs font-bold uppercase tracking-wide">Authenticity confirmed</p><p className="mt-0.5 font-mono text-[11px] text-emerald-800">{certificate.verification_code}</p></div>
+                {qrCode ? <img src={qrCode} alt="QR code to verify this certificate" className="h-12 w-12 rounded-md bg-white p-0.5" /> : <ShieldCheck className="h-8 w-8 shrink-0 text-emerald-700" />}
+                <div><p className="text-xs font-bold uppercase tracking-wide">Authenticity confirmed</p><p className="mt-0.5 font-mono text-[11px] text-emerald-800">{certificate.verification_code}</p><p className="mt-0.5 text-[10px] text-emerald-700">Scan to verify online</p></div>
               </div>
             </div>
           </div>
