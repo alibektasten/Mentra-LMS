@@ -4,7 +4,7 @@ import { CheckCircle2, Circle } from 'lucide-react'
 import { useProgress } from '@/lib/queries/progress.queries'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatDate } from '@/lib/utils/format'
+import { formatDate, formatPercent, normalizePercentage } from '@/lib/utils/format'
 import { useI18n } from '@/lib/i18n'
 
 export default function StudentProgressPage() {
@@ -74,8 +74,10 @@ export default function StudentProgressPage() {
                 </span>
                 {p.score != null && (
                   <div className="flex items-center gap-2 shrink-0">
-                    <Progress value={p.score} className="h-1 w-20" />
-                    <span className="text-xs font-semibold text-[#3b3b3b] w-9 text-right">{p.score}%</span>
+                    <Progress value={normalizePercentage(p.score)} className="h-1 w-20" />
+                    <span className="w-11 text-right text-xs font-semibold tabular-nums text-[#3b3b3b]">
+                      {formatPercent(p.score)}
+                    </span>
                   </div>
                 )}
                 <span className="text-[11px] text-[#9b9b9b] shrink-0 w-24 text-right">

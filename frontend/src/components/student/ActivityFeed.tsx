@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Circle } from 'lucide-react'
 import { ProgressDTO } from '@/types/progress'
-import { formatDate } from '@/lib/utils/format'
+import { formatDate, formatPercent } from '@/lib/utils/format'
 import { useI18n } from '@/lib/i18n'
 
 interface ActivityFeedProps {
@@ -34,7 +34,7 @@ export function ActivityFeed({ progress }: ActivityFeedProps) {
               </span>
               <div className="flex items-center gap-2 shrink-0">
                 {p.score != null && (
-                  <span className="text-xs font-semibold text-[#059669]">{p.score}%</span>
+                  <span className="text-xs font-semibold tabular-nums text-[#059669]">{formatPercent(p.score)}</span>
                 )}
                 <span className="text-[11px] text-[#9b9b9b]">{formatDate(p.created_at)}</span>
               </div>

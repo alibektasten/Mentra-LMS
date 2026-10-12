@@ -23,7 +23,13 @@ export function formatRelativeTime(dateStr: string): string {
 }
 
 export function formatPercent(value: number): string {
-  return `${Math.round(value)}%`
+  return `${normalizePercentage(value)}%`
+}
+
+/** Keeps progress values safe for both labels and progress-bar widths. */
+export function normalizePercentage(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.min(100, Math.max(0, Math.round(value)))
 }
 
 export function truncate(str: string, length: number): string {
