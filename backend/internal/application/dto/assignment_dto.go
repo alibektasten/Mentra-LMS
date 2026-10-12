@@ -44,6 +44,7 @@ type SubmissionDTO struct {
 	ID           string     `json:"id"`
 	AssignmentID string     `json:"assignment_id"`
 	StudentID    string     `json:"student_id"`
+	StudentName  string     `json:"student_name"`
 	TextContent  string     `json:"text_content"`
 	LinkURL      string     `json:"link_url"`
 	FilePath     string     `json:"file_path"`

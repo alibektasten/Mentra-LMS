@@ -111,7 +111,11 @@ func (r *GORMAssignmentRepository) FindSubmissionByID(ctx context.Context, id uu
 
 func (r *GORMAssignmentRepository) FindSubmissionsByAssignment(ctx context.Context, assignmentID uuid.UUID) ([]*entities.AssignmentSubmission, error) {
 	var models []database.AssignmentSubmissionModel
-	err := r.db.WithContext(ctx).Where("assignment_id = ?", assignmentID.String()).Find(&models).Error
+	err := r.db.WithContext(ctx).
+		Where("assignment_id = ?", assignmentID.String()).
+		Order("CASE WHEN score IS NULL THEN 0 ELSE 1 END").
+		Order("submitted_at DESC").
+		Find(&models).Error
 	if err != nil {
 		return nil, apperrors.InternalError(err.Error())
 	}

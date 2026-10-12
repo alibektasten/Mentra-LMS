@@ -17,6 +17,7 @@ export interface SubmissionDTO {
   id: string;
   assignment_id: string;
   student_id: string;
+  student_name: string;
   text_content: string;
   link_url: string;
   file_path: string;

@@ -14,10 +14,15 @@ import (
 type AssignmentUseCase struct {
 	assignmentRepo repositories.AssignmentRepository
 	moduleRepo     repositories.ModuleRepository
+	userRepo       repositories.UserRepository
 }
 
-func NewAssignmentUseCase(assignmentRepo repositories.AssignmentRepository, moduleRepo repositories.ModuleRepository) *AssignmentUseCase {
-	return &AssignmentUseCase{assignmentRepo: assignmentRepo, moduleRepo: moduleRepo}
+func NewAssignmentUseCase(assignmentRepo repositories.AssignmentRepository, moduleRepo repositories.ModuleRepository, userRepos ...repositories.UserRepository) *AssignmentUseCase {
+	var userRepo repositories.UserRepository
+	if len(userRepos) > 0 {
+		userRepo = userRepos[0]
+	}
+	return &AssignmentUseCase{assignmentRepo: assignmentRepo, moduleRepo: moduleRepo, userRepo: userRepo}
 }
 
 func (uc *AssignmentUseCase) Create(ctx context.Context, courseID, moduleID, orgID uuid.UUID, req dto.CreateAssignmentRequest) (*dto.AssignmentDTO, error) {
@@ -158,6 +163,13 @@ func (uc *AssignmentUseCase) ListSubmissions(ctx context.Context, assignmentID u
 	result := make([]*dto.SubmissionDTO, len(submissions))
 	for i, s := range submissions {
 		result[i] = toSubmissionDTO(s)
+		if uc.userRepo != nil {
+			student, err := uc.userRepo.FindByID(ctx, s.StudentID)
+			if err != nil {
+				return nil, err
+			}
+			result[i].StudentName = student.Name
+		}
 	}
 	return result, nil
 }
@@ -219,6 +231,7 @@ func toSubmissionDTO(s *entities.AssignmentSubmission) *dto.SubmissionDTO {
 		ID:           s.ID.String(),
 		AssignmentID: s.AssignmentID.String(),
 		StudentID:    s.StudentID.String(),
+		StudentName:  "",
 		TextContent:  s.TextContent,
 		LinkURL:      s.LinkURL,
 		FilePath:     s.FilePath,

@@ -94,6 +94,8 @@ function SubmissionRow({ submission, maxPoints, dueDate, onGrade }: SubmissionRo
   const hasChanged =
     score !== (submission.score?.toString() ?? '') ||
     feedback !== (submission.feedback ?? '')
+  const studentName = submission.student_name || 'Student'
+  const initials = studentName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
 
   return (
     <div className={cn(
@@ -104,12 +106,10 @@ function SubmissionRow({ submission, maxPoints, dueDate, onGrade }: SubmissionRo
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           <div className="h-7 w-7 rounded-full bg-[#f0eeeb] flex items-center justify-center text-xs font-semibold text-[#6b6b6b]">
-            {submission.student_id.slice(0, 2).toUpperCase()}
+            {initials || 'S'}
           </div>
           <div>
-            <p className="text-xs font-mono text-[#6b6b6b]">
-              {submission.student_id.slice(0, 8)}…
-            </p>
+            <p className="text-sm font-semibold text-[#1a1a1a]">{studentName}</p>
             <div className="flex items-center gap-1.5 text-[11px] text-[#9b9b9b]">
               <Clock className="h-3 w-3" />
               {submittedDate}
