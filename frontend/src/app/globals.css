@@ -170,6 +170,22 @@
       linear-gradient(180deg, #fbfbf9 0%, #f7f7f4 100%);
   }
 
+  /* Keep navigation as a full-height column while the page content scrolls. */
+  .app-sidebar {
+    min-height: 100vh;
+  }
+
+  @media (min-width: 1024px) {
+    .app-sidebar {
+      position: sticky !important;
+      top: 0;
+      height: 100vh;
+      height: 100dvh;
+      min-height: 100vh;
+      align-self: flex-start;
+    }
+  }
+
   .content-surface {
     box-shadow: 0 18px 50px rgba(32, 31, 27, 0.04);
   }

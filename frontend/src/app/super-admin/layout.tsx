@@ -19,7 +19,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
   ].filter((item) => !dismissed.has(item.id)), [dismissed, stats?.total_orgs, stats?.total_users])
 
   return (
-    <div className="sa-shell flex min-h-screen overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="sa-shell flex min-h-screen overflow-x-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {mobileNavOpen && (
         <button
           aria-label="Close navigation menu"

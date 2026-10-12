@@ -63,7 +63,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const roleLabel = role === 'super_admin' ? 'Platform administrator' : role === 'admin' ? 'Organization administrator' : role === 'teacher' ? 'Instructor' : 'Student'
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[264px] shrink-0 flex-col border-r border-[#e7e6e0] bg-[#fbfbf9] shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:z-auto lg:self-start lg:translate-x-0 lg:shadow-none ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`app-sidebar fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[264px] shrink-0 flex-col border-r border-[#e7e6e0] bg-[#fbfbf9] shadow-2xl transition-transform duration-300 lg:z-auto lg:translate-x-0 lg:shadow-none ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Brand */}
       <div className="flex h-[72px] items-center gap-3 px-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#111110] to-[#3a3a35] text-white text-xs font-bold shadow-[0_5px_12px_rgba(17,17,16,0.16)]">

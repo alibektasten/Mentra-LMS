@@ -12,7 +12,7 @@ export function AppShell({ children }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
-    <div className="app-canvas flex min-h-screen overflow-hidden">
+    <div className="app-canvas flex min-h-screen overflow-x-hidden">
       {mobileNavOpen && (
         <button
           aria-label="Close navigation menu"
