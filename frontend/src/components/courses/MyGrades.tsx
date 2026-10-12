@@ -30,7 +30,7 @@ export function MyGrades({ courseId }: MyGradesProps) {
     return <p className="text-sm text-ink-muted py-4">{t('noGradedItems')}</p>
   }
 
-  const letter = letterGrade(data.percentage)
+  const letter = data.is_final_grade_ready ? letterGrade(data.percentage) : '—'
   const gradedCount = data.items.filter((item) => item.status === 'graded').length
   const submittedCount = data.items.filter((item) => item.status === 'submitted').length
 
@@ -41,8 +41,8 @@ export function MyGrades({ courseId }: MyGradesProps) {
         <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-ink-muted">Final grade (weighted)</p>
-          <p className="text-2xl font-bold text-ink">{data.percentage.toFixed(1)}%</p>
-          <p className="text-xs text-ink-subtle">Assignments, midterm, endterm, and final exam</p>
+          <p className="text-2xl font-bold text-ink">{data.is_final_grade_ready ? `${data.percentage.toFixed(1)}%` : 'Pending'}</p>
+          <p className="text-xs text-ink-subtle">{data.is_final_grade_ready ? 'Assignments, midterm, endterm, and final exam' : 'The final grade appears after every required component is graded.'}</p>
         </div>
         <div className="text-4xl font-bold text-accent">{letter}</div>
         </div>

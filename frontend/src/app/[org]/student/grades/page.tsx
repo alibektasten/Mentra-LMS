@@ -31,7 +31,7 @@ export default function StudentGradesPage() {
 
   const isLoading = coursesLoading || gradeQueries.some((query) => query.isLoading)
   const rows = courses.map((course, index) => ({ course, grades: gradeQueries[index]?.data }))
-  const gradedCourses = rows.filter(({ grades }) => grades && grades.total_possible > 0)
+  const gradedCourses = rows.filter(({ grades }) => grades?.is_final_grade_ready)
   const totalPossible = gradedCourses.reduce((sum, { grades }) => sum + (grades?.total_possible ?? 0), 0)
   const totalEarned = gradedCourses.reduce((sum, { grades }) => sum + (grades?.total_earned ?? 0), 0)
   const overallPercent = totalPossible ? (totalEarned / totalPossible) * 100 : 0
@@ -63,11 +63,11 @@ export default function StudentGradesPage() {
                 {rows.map(({ course, grades }) => {
                   const graded = grades?.items.filter((item) => item.status === 'graded').length ?? 0
                   const submitted = grades?.items.filter((item) => item.status === 'submitted').length ?? 0
-                  const hasGrades = Boolean(grades?.total_possible)
+                  const hasGrades = Boolean(grades?.is_final_grade_ready)
                   return <Link key={course.id} href={`/${org}/student/courses/${course.id}`} className="group flex items-center gap-4 px-5 py-4 transition hover:bg-[#fafaf8]">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><BookOpen className="h-5 w-5" /></span>
                     <div className="min-w-0 flex-1"><p className="truncate font-semibold text-[#272722]">{course.title}</p><p className="mt-1 text-xs text-[#85847e]">{graded} graded · {submitted} awaiting review</p></div>
-                    {hasGrades ? <div className="text-right"><p className="text-lg font-bold text-[#22221f]">{grades?.percentage.toFixed(1)}%</p><p className="text-xs font-medium text-emerald-700">{letterGrade(grades?.percentage ?? 0)}</p></div> : <span className="text-xs font-medium text-[#9b9a94]">No grades</span>}
+                    {hasGrades ? <div className="text-right"><p className="text-lg font-bold text-[#22221f]">{grades?.percentage.toFixed(1)}%</p><p className="text-xs font-medium text-emerald-700">{letterGrade(grades?.percentage ?? 0)}</p></div> : <span className="text-xs font-medium text-amber-700">Assessment in progress</span>}
                     <ChevronRight className="h-4 w-4 text-[#aaa9a2] transition group-hover:translate-x-0.5 group-hover:text-emerald-700" />
                   </Link>
                 })}

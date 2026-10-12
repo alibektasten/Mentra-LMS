@@ -178,7 +178,7 @@ function ExamCard({ exam, org, courseId }: { exam: ExamListItemDTO; org: string;
         <GraduationCap className="h-4 w-4 text-[#9b9b9b] shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[#1a1a1a] truncate group-hover:text-[#059669]">{exam.title}</p>
-          <p className="text-xs text-[#9b9b9b]">{exam.duration_minutes} min · {exam.total_points} pts</p>
+          <p className="text-xs text-[#9b9b9b]"><span className="capitalize font-semibold text-[#6b6b6b]">{exam.assessment_type === 'other' ? 'Exam' : exam.assessment_type}</span> · {exam.duration_minutes} min · {exam.total_points} pts</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {dueDate && (
