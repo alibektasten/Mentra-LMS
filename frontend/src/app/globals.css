@@ -175,7 +175,25 @@
     min-height: 100vh;
   }
 
+  .app-sidebar-column {
+    background: #fbfbf9;
+  }
+
+  .sa-sidebar-column {
+    background: linear-gradient(180deg, #172033 0%, #0f1728 100%);
+  }
+
   @media (min-width: 1024px) {
+    .app-sidebar-column {
+      min-height: 100%;
+      align-self: stretch;
+      border-right: 1px solid #e7e6e0;
+    }
+
+    .sa-sidebar-column {
+      border-right-color: rgba(255, 255, 255, 0.1);
+    }
+
     .app-sidebar {
       position: sticky !important;
       top: 0;

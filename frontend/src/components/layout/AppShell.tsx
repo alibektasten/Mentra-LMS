@@ -20,7 +20,9 @@ export function AppShell({ children }: AppShellProps) {
           onClick={() => setMobileNavOpen(false)}
         />
       )}
-      <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <div className="app-sidebar-column contents lg:block lg:w-[264px] lg:shrink-0">
+        <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      </div>
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar onMenuClick={() => setMobileNavOpen(true)} />
         <main className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8 lg:py-7">

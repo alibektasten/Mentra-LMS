@@ -27,7 +27,9 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
           onClick={() => setMobileNavOpen(false)}
         />
       )}
-      <SuperAdminSidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <div className="app-sidebar-column sa-sidebar-column contents lg:block lg:w-[272px] lg:shrink-0">
+        <SuperAdminSidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      </div>
       <main className="min-w-0 flex-1 overflow-y-auto">
         <header className="flex h-[72px] items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-9 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center gap-3">
