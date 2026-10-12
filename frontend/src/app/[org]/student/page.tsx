@@ -1,8 +1,11 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useQueries } from '@tanstack/react-query'
 import { useCourses } from '@/lib/queries/courses.queries'
 import { useProgress } from '@/lib/queries/progress.queries'
+import { getUpcomingDeadlines } from '@/lib/api/grades'
+import { gradeKeys } from '@/lib/queries/grades.queries'
 import { WelcomeHero } from '@/components/student/WelcomeHero'
 import { StatsStrip } from '@/components/student/StatsStrip'
 import { AIStudyPanel } from '@/components/student/AIStudyPanel'
@@ -16,7 +19,27 @@ export default function StudentDashboard() {
   const { data: progress = [] } = useProgress()
 
   const courses = coursesData?.data ?? []
+  const publishedCourses = useMemo(() => courses.filter((course) => course.status === 'published'), [courses])
   const firstCourse = courses.find((c) => c.status === 'published')
+  const deadlineQueries = useQueries({
+    queries: publishedCourses.map((course) => ({
+      queryKey: gradeKeys.deadlines(course.id),
+      queryFn: () => getUpcomingDeadlines(course.id),
+      staleTime: 60_000,
+    })),
+  })
+  const deadlines = useMemo(() => deadlineQueries.flatMap((query, index) => {
+    const course = publishedCourses[index]
+    if (!course) return []
+    return (query.data ?? []).map((deadline) => ({
+      id: `${course.id}-${deadline.item_id}`,
+      title: deadline.title,
+      dueDate: deadline.due_date,
+      courseID: course.id,
+      courseTitle: course.title,
+      submitted: deadline.submitted,
+    }))
+  }), [deadlineQueries, publishedCourses])
 
   const lastProgress = useMemo(
     () =>
@@ -70,7 +93,7 @@ export default function StudentDashboard() {
         {/* Right column — secondary / tools */}
         <div className="space-y-8">
           <QuickActions lastProgress={lastProgress} />
-          <MiniCalendar progress={progress} />
+          <MiniCalendar progress={progress} deadlines={deadlines} />
           <AIStudyPanel courseId={firstCourse?.id} courseTitle={firstCourse?.title} />
         </div>
       </div>
