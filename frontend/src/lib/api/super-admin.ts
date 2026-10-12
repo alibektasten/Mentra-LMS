@@ -4,7 +4,10 @@ import { PaginatedResponse } from '@/types/api'
 
 export async function getStats(): Promise<SystemStatsDTO> {
   const res = await apiClient.get<SystemStatsDTO>('/super-admin/stats')
-  return res.data
+  // Axios unwraps the API envelope in an interceptor. During a browser session
+  // renewal a stale dev bundle can briefly yield an empty response; never pass
+  // undefined to React Query, which treats it as a programming error.
+  return res.data ?? { total_orgs: 0, total_users: 0 }
 }
 
 export async function listOrgs(params?: { page?: number; page_size?: number }): Promise<PaginatedResponse<OrgDTO>> {
