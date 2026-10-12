@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { useCourses } from '@/lib/queries/courses.queries'
 import { useProgress } from '@/lib/queries/progress.queries'
+import { useStudentLessonContexts } from '@/lib/queries/student-lesson-context.queries'
 import { getUpcomingDeadlines } from '@/lib/api/grades'
 import { gradeKeys } from '@/lib/queries/grades.queries'
 import { WelcomeHero } from '@/components/student/WelcomeHero'
@@ -19,6 +20,7 @@ export default function StudentDashboard() {
   const { data: progress = [] } = useProgress()
 
   const courses = coursesData?.data ?? []
+  const lessonContexts = useStudentLessonContexts(courses)
   const publishedCourses = useMemo(() => courses.filter((course) => course.status === 'published'), [courses])
   const firstCourse = courses.find((c) => c.status === 'published')
   const deadlineQueries = useQueries({
@@ -87,7 +89,7 @@ export default function StudentDashboard() {
         {/* Left column — primary content */}
         <div className="space-y-8">
           <RecentCourses courses={courses} isLoading={coursesLoading} />
-          <ActivityFeed progress={progress} />
+          <ActivityFeed progress={progress} lessonContexts={lessonContexts} />
         </div>
 
         {/* Right column — secondary / tools */}

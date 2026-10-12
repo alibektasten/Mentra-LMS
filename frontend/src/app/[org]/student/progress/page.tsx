@@ -1,7 +1,11 @@
 'use client'
 
 import { CheckCircle2, Circle } from 'lucide-react'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { useProgress } from '@/lib/queries/progress.queries'
+import { useCourses } from '@/lib/queries/courses.queries'
+import { useStudentLessonContexts } from '@/lib/queries/student-lesson-context.queries'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatPercent, normalizePercentage } from '@/lib/utils/format'
@@ -9,7 +13,10 @@ import { useI18n } from '@/lib/i18n'
 
 export default function StudentProgressPage() {
   const { t } = useI18n()
+  const { org } = useParams<{ org: string }>()
   const { data: progress = [], isLoading } = useProgress()
+  const { data: coursesData } = useCourses({ page: 1, page_size: 100 })
+  const lessonContexts = useStudentLessonContexts(coursesData?.data ?? [])
 
   const completed = progress.filter((p) => !!p.completed_at)
   const withScore = completed.filter((p) => p.score != null)
@@ -63,15 +70,18 @@ export default function StudentProgressPage() {
           </div>
         ) : (
           <div className="divide-y divide-[#e8e8e6] border border-[#e8e8e6] rounded-lg overflow-hidden">
-            {recent.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-[#f7f7f5] transition-colors">
+            {recent.map((p) => {
+              const context = lessonContexts.get(p.lesson_id)
+              const activityLabel = p.completed_at ? t('completedLesson') : t('startedLesson')
+              const content = <>
                 {p.completed_at
                   ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#059669]" />
                   : <Circle className="h-3.5 w-3.5 shrink-0 text-[#c9c9c9]" />
                 }
-                <span className="flex-1 text-sm text-[#3b3b3b]">
-                  {p.completed_at ? t('completedLesson') : t('startedLesson')}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-[#3b3b3b]">{context?.lessonTitle ?? activityLabel}</p>
+                  <p className="truncate text-[11px] text-[#8f8f89]">{context ? `${context.courseTitle} · ${context.moduleTitle}` : activityLabel}</p>
+                </div>
                 {p.score != null && (
                   <div className="flex items-center gap-2 shrink-0">
                     <Progress value={normalizePercentage(p.score)} className="h-1 w-20" />
@@ -83,8 +93,9 @@ export default function StudentProgressPage() {
                 <span className="text-[11px] text-[#9b9b9b] shrink-0 w-24 text-right">
                   {formatDate(p.created_at)}
                 </span>
-              </div>
-            ))}
+              </>
+              return context ? <Link key={p.id} href={`/${org}/student/courses/${context.courseID}/lessons/${context.lessonID}`} className="flex items-center gap-3 px-3.5 py-2.5 transition-colors hover:bg-[#f7f7f5]">{content}</Link> : <div key={p.id} className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-[#f7f7f5] transition-colors">{content}</div>
+            })}
           </div>
         )}
       </div>
