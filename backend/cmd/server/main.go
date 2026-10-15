@@ -99,7 +99,7 @@ func main() {
 
 	// Init use cases
 	authUC := usecases.NewAuthUseCase(userRepo, orgRepo, memberRepo, cfg.JWT.Secret)
-	courseUC := usecases.NewCourseUseCase(courseRepo, memberRepo, groupRepo, courseTeacherRepo)
+	courseUC := usecases.NewCourseUseCase(courseRepo, memberRepo, groupRepo, courseTeacherRepo, examRepo)
 	courseTeacherUC := usecases.NewCourseTeacherUseCase(courseTeacherRepo, memberRepo)
 	memberUC := usecases.NewMemberUseCase(userRepo, memberRepo)
 	moduleUC := usecases.NewModuleUseCase(moduleRepo, courseRepo)

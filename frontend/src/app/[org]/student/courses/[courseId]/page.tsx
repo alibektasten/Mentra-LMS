@@ -221,7 +221,7 @@ function ExamListSection({ courseId, org }: { courseId: string; org: string }) {
 
   return (
     <div className="space-y-2">
-      {examList.map((exam) => (
+      {examList.filter((exam) => exam.assessment_type === 'other' || !!exam.due_date).map((exam) => (
         <ExamCard key={exam.id} exam={exam} org={org} courseId={courseId} />
       ))}
     </div>

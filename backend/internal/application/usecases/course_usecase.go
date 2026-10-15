@@ -15,6 +15,7 @@ type CourseUseCase struct {
 	memberRepo repositories.MembershipRepository
 	groupRepo  repositories.GroupRepository
 	ctRepo     repositories.CourseTeacherRepository
+	examRepo   repositories.ExamRepository
 }
 
 func NewCourseUseCase(
@@ -22,8 +23,13 @@ func NewCourseUseCase(
 	memberRepo repositories.MembershipRepository,
 	groupRepo repositories.GroupRepository,
 	ctRepo repositories.CourseTeacherRepository,
+	extras ...interface{},
 ) *CourseUseCase {
-	return &CourseUseCase{courseRepo: courseRepo, memberRepo: memberRepo, groupRepo: groupRepo, ctRepo: ctRepo}
+	var examRepo repositories.ExamRepository
+	if len(extras) > 0 {
+		examRepo, _ = extras[0].(repositories.ExamRepository)
+	}
+	return &CourseUseCase{courseRepo: courseRepo, memberRepo: memberRepo, groupRepo: groupRepo, ctRepo: ctRepo, examRepo: examRepo}
 }
 
 func (uc *CourseUseCase) CreateCourse(ctx context.Context, req dto.CreateCourseRequest, creatorID, orgID uuid.UUID) (*dto.CourseDTO, error) {
@@ -55,7 +61,49 @@ func (uc *CourseUseCase) CreateCourse(ctx context.Context, req dto.CreateCourseR
 	}); err != nil {
 		return nil, err
 	}
+	if uc.examRepo != nil {
+		if err := uc.createAssessmentPlan(ctx, course); err != nil {
+			return nil, err
+		}
+	}
 	return toCourseDTO(course), nil
+}
+
+// createAssessmentPlan provisions the required assessments as editable
+// placeholders. They remain unavailable to students until the teacher assigns
+// a due date, so a newly created course has a complete grading plan without
+// exposing unfinished exams.
+func (uc *CourseUseCase) createAssessmentPlan(ctx context.Context, course *entities.Course) error {
+	now := time.Now()
+	plan := []struct {
+		assessmentType string
+		title          string
+		description    string
+	}{
+		{"midterm", "Midterm examination", "Required midterm assessment. Set a date and add instructions or questions before scheduling."},
+		{"endterm", "Endterm examination", "Required endterm assessment. Set a date and add instructions or questions before scheduling."},
+		{"final", "Final examination", "Required final assessment. Set a date and add instructions or questions before scheduling."},
+	}
+	for _, item := range plan {
+		exam := &entities.Exam{
+			ID:              uuid.New(),
+			CourseID:        course.ID,
+			OrgID:           course.OrgID,
+			AssessmentType:  item.assessmentType,
+			Title:           item.title,
+			Description:     item.description,
+			DurationMinutes: 120,
+			MaxAttempts:     1,
+			FileEnabled:     true,
+			FilePoints:      100,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+		}
+		if err := uc.examRepo.Create(ctx, exam); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (uc *CourseUseCase) GetCourse(ctx context.Context, id, orgID uuid.UUID) (*dto.CourseDTO, error) {

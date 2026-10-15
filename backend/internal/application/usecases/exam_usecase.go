@@ -213,6 +213,9 @@ func (uc *ExamUseCase) StartAttempt(ctx context.Context, examID, studentID, orgI
 	if exam.DueDate != nil && time.Now().After(*exam.DueDate) {
 		return nil, apperrors.ValidationError("exam due date has passed")
 	}
+	if isScheduledAssessment(exam.AssessmentType) && exam.DueDate == nil {
+		return nil, apperrors.ValidationError("this assessment has not been scheduled yet")
+	}
 
 	// Idempotent: return existing in_progress attempt
 	active, err := uc.attemptRepo.FindActiveAttempt(ctx, examID, studentID)

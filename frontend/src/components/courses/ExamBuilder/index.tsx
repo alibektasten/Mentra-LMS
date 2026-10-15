@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Plus, GraduationCap, Clock, Star, Pencil, Trash2, Users, CheckCircle2, Circle } from 'lucide-react'
 import { toast } from 'sonner'
-import { useExams, useCreateExam, useDeleteExam } from '@/lib/queries/exams.queries'
+import { useExams, useCreateExam, useDeleteExam, useUpdateExam } from '@/lib/queries/exams.queries'
 import { ExamListItemDTO } from '@/types/exam'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -22,6 +22,7 @@ export function ExamBuilder({ courseId }: ExamBuilderProps) {
   const { org } = useParams<{ org: string }>()
   const { data: exams, isLoading } = useExams(courseId)
   const createExam = useCreateExam(courseId)
+  const updateExam = useUpdateExam(courseId)
   const deleteExam = useDeleteExam(courseId)
 
   const [formOpen, setFormOpen] = useState(false)
@@ -53,15 +54,19 @@ export function ExamBuilder({ courseId }: ExamBuilderProps) {
   }
 
   const createAssessmentSchedule = async () => {
-    const missing = requiredAssessments.filter((item) => !examList.some((exam) => exam.assessment_type === item.type))
-    if (missing.some((item) => !scheduleDates[item.type as keyof typeof scheduleDates])) {
-      toast.error('Set a date for every missing assessment')
+    const pending = requiredAssessments.filter((item) => {
+      const exam = examList.find((value) => value.assessment_type === item.type)
+      return !exam?.due_date
+    })
+    if (pending.some((item) => !scheduleDates[item.type as keyof typeof scheduleDates])) {
+		  toast.error('Set a date for every unscheduled assessment')
       return
     }
     try {
-      for (const item of missing) {
+      for (const item of pending) {
         const dueDate = scheduleDates[item.type as keyof typeof scheduleDates]
-        await createExam.mutateAsync({
+        const existing = examList.find((value) => value.assessment_type === item.type)
+        const schedule = {
           assessment_type: item.type as 'midterm' | 'endterm' | 'final',
           title: item.type === 'final' ? 'Final examination' : `${item.label} examination`,
           description: `Scheduled ${item.label.toLowerCase()}. Add instructions or questions before its due date.`,
@@ -73,7 +78,12 @@ export function ExamBuilder({ courseId }: ExamBuilderProps) {
           file_enabled: true,
           file_points: 100,
           questions: [],
-        })
+        }
+        if (existing) {
+          await updateExam.mutateAsync({ id: existing.id, data: schedule })
+        } else {
+          await createExam.mutateAsync(schedule)
+        }
       }
       toast.success('Assessment schedule created')
       setScheduleOpen(false)
@@ -124,11 +134,11 @@ export function ExamBuilder({ courseId }: ExamBuilderProps) {
         <p className="mt-1 text-xs text-[#77766f]">Assignments contribute 25% of the final grade. Add each required exam to complete the course schedule.</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {requiredAssessments.map((item) => {
-            const exists = examList.some((exam) => exam.assessment_type === item.type)
-            return <div key={item.type} className="flex items-center gap-2 rounded-lg border border-[#e7e6e0] bg-white px-3 py-2 text-xs"><span className={exists ? 'text-emerald-600' : 'text-[#aaa9a2]'}>{exists ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}</span><span className="font-semibold text-[#45453f]">{item.label}</span><span className="ml-auto text-[#888780]">{item.weight}</span></div>
+            const scheduled = examList.some((exam) => exam.assessment_type === item.type && exam.due_date)
+            return <div key={item.type} className="flex items-center gap-2 rounded-lg border border-[#e7e6e0] bg-white px-3 py-2 text-xs"><span className={scheduled ? 'text-emerald-600' : 'text-[#aaa9a2]'}>{scheduled ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}</span><span className="font-semibold text-[#45453f]">{item.label}</span><span className="ml-auto text-[#888780]">{item.weight}</span></div>
           })}
         </div>
-		{requiredAssessments.some((item) => !examList.some((exam) => exam.assessment_type === item.type)) && <Button variant="outline" size="sm" className="mt-3" onClick={() => setScheduleOpen(true)}>Schedule missing assessments</Button>}
+		{requiredAssessments.some((item) => !examList.some((exam) => exam.assessment_type === item.type && exam.due_date)) && <Button variant="outline" size="sm" className="mt-3" onClick={() => setScheduleOpen(true)}>Schedule assessments</Button>}
       </div>
 
       {examList.length === 0 ? (
@@ -205,11 +215,11 @@ export function ExamBuilder({ courseId }: ExamBuilderProps) {
       <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Schedule course assessments</DialogTitle></DialogHeader>
-          <p className="text-sm text-[#6b6b6b]">Set deadlines for the missing assessments. Mentra will create editable 100-point assessment shells, ready for you to add questions or instructions.</p>
+		  <p className="text-sm text-[#6b6b6b]">Set deadlines for the assessments that are not yet scheduled. Mentra keeps each assessment editable until students begin it.</p>
           <div className="space-y-3 py-2">
-            {requiredAssessments.filter((item) => !examList.some((exam) => exam.assessment_type === item.type)).map((item) => <label key={item.type} className="block text-sm font-medium text-[#45453f]">{item.label} <span className="text-[#9b9b9b]">({item.weight})</span><input type="datetime-local" value={scheduleDates[item.type as keyof typeof scheduleDates]} onChange={(event) => setScheduleDates((current) => ({ ...current, [item.type]: event.target.value }))} className="mt-1.5 flex h-10 w-full rounded-md border border-[#e4e2de] bg-white px-3 text-sm" /></label>)}
+            {requiredAssessments.filter((item) => !examList.some((exam) => exam.assessment_type === item.type && exam.due_date)).map((item) => <label key={item.type} className="block text-sm font-medium text-[#45453f]">{item.label} <span className="text-[#9b9b9b]">({item.weight})</span><input type="datetime-local" value={scheduleDates[item.type as keyof typeof scheduleDates]} onChange={(event) => setScheduleDates((current) => ({ ...current, [item.type]: event.target.value }))} className="mt-1.5 flex h-10 w-full rounded-md border border-[#e4e2de] bg-white px-3 text-sm" /></label>)}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setScheduleOpen(false)}>Cancel</Button><Button className="bg-[#059669] hover:bg-[#047857]" onClick={createAssessmentSchedule} disabled={createExam.isPending}>{createExam.isPending ? 'Creating…' : 'Create schedule'}</Button></DialogFooter>
+		  <DialogFooter><Button variant="outline" onClick={() => setScheduleOpen(false)}>Cancel</Button><Button className="bg-[#059669] hover:bg-[#047857]" onClick={createAssessmentSchedule} disabled={createExam.isPending || updateExam.isPending}>{createExam.isPending || updateExam.isPending ? 'Saving…' : 'Save schedule'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
