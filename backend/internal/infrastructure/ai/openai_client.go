@@ -315,6 +315,12 @@ func (c *OpenAIClient) GenerateProgressInsights(ctx context.Context, progress []
 		fmt.Sprintf("A student completed %d of %d lessons and has an average score of %.1f%%. Provide 2-3 personalized study insights.", completed, len(progress), average), nil)
 }
 
+func (c *OpenAIClient) GenerateTeachingPlan(ctx context.Context, topic, audience, language string, durationMinutes int) (string, error) {
+	return c.generate(ctx,
+		"You are an expert instructional designer. Create practical, inclusive, evidence-informed teaching plans. Do not invent external resources or factual claims.",
+		fmt.Sprintf("Create a %d-minute lesson plan for %s on the topic %q. Write in %s. Include: 1) three measurable learning objectives, 2) a timed lesson flow, 3) active-learning activities and concise teacher prompts, 4) a formative assessment or exit ticket, and 5) materials plus accessibility considerations. Use clear markdown headings and keep it actionable.", durationMinutes, audience, topic, language), nil)
+}
+
 func stringArraySchema() map[string]any {
 	return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
 }

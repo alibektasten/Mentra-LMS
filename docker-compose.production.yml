@@ -106,6 +106,7 @@ services:
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
     volumes:
       - ./data/backups:/backups
+      - ./data/uploads:/uploads:ro
     depends_on:
       postgres:
         condition: service_healthy

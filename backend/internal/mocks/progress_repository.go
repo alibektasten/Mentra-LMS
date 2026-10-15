@@ -30,6 +30,14 @@ func (m *MockLessonProgressRepository) FindByUser(ctx context.Context, userID, o
 	return args.Get(0).([]entities.LessonProgress), args.Error(1)
 }
 
+func (m *MockLessonProgressRepository) FindByUserAndCourse(ctx context.Context, userID, courseID, orgID uuid.UUID) ([]entities.LessonProgress, error) {
+	args := m.Called(ctx, userID, courseID, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]entities.LessonProgress), args.Error(1)
+}
+
 func (m *MockLessonProgressRepository) Update(ctx context.Context, progress *entities.LessonProgress) error {
 	args := m.Called(ctx, progress)
 	return args.Error(0)

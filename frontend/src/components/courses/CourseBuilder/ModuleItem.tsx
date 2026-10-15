@@ -133,7 +133,13 @@ export function ModuleItem({ courseId, module, onUpdate, onLessonsChange }: Modu
         <button {...attributes} {...listeners} className="cursor-grab text-ink-subtle hover:text-ink-muted">
           <GripVertical className="h-4 w-4" />
         </button>
-        <button onClick={handleToggleOpen} className="text-ink-muted hover:text-ink">
+        <button
+          type="button"
+          onClick={handleToggleOpen}
+          aria-label={`Toggle module ${module.title}`}
+          aria-expanded={Boolean(module._open)}
+          className="text-ink-muted hover:text-ink"
+        >
           {module._open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </button>
         {isEditing ? (

@@ -45,6 +45,7 @@ export function LoginForm({ orgSlug, returnTo, isSuperAdmin }: LoginFormProps) {
         role: result.role,
         orgSlug: isSuperAdmin ? '' : orgSlug,
         expiresAt: result.expiresAt,
+        authProvider: 'password',
       })
       if (isSuperAdmin) {
         router.push('/super-admin/dashboard')

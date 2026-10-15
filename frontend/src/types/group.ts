@@ -50,3 +50,24 @@ export interface CreateGroupScheduleInput {
 export interface AddMemberInput {
   student_id: string
 }
+
+export type AttendanceStatus = 'present' | 'late' | 'absent'
+
+export interface AttendanceStudentDTO {
+  student_id: string
+  name: string
+  email: string
+  status: AttendanceStatus | ''
+}
+
+export interface AttendanceSheetDTO {
+  group_id: string
+  course_id: string
+  date: string
+  students: AttendanceStudentDTO[]
+}
+
+export interface SaveAttendanceInput {
+  date: string
+  records: Array<{ student_id: string; status: AttendanceStatus }>
+}

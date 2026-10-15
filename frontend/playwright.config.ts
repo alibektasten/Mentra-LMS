@@ -6,9 +6,14 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   reporter: 'list',
+  forbidOnly: Boolean(process.env.CI),
+  outputDir: 'test-results',
   use: {
-    // Override for a staging or production smoke check without editing the config.
-    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3000',
+    // E2E_BASE_URL is deliberately required by helpers: no silent fallback to
+    // a developer's browser session or a production deployment.
+    baseURL: process.env.E2E_BASE_URL,
+    locale: process.env.E2E_LOCALE ?? 'en-US',
+    timezoneId: process.env.E2E_TIMEZONE ?? 'Asia/Almaty',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

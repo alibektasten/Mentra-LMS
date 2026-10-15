@@ -10,12 +10,14 @@ export interface StudentLessonContext {
   lessonID: string
   lessonTitle: string
   moduleTitle: string
+  moduleOrder: number
+  lessonOrder: number
   courseID: string
   courseTitle: string
 }
 
 /** Builds a lookup for progress records so activity can name the exact lesson and course. */
-export function useStudentLessonContexts(courses: CourseDTO[]) {
+export function useStudentLessonContextsState(courses: CourseDTO[]) {
   const publishedCourses = useMemo(() => courses.filter((course) => course.status === 'published'), [courses])
   const moduleQueries = useQueries({
     queries: publishedCourses.map((course) => ({
@@ -39,7 +41,7 @@ export function useStudentLessonContexts(courses: CourseDTO[]) {
     })),
   })
 
-  return useMemo(() => {
+  const contexts = useMemo(() => {
     const contexts = new Map<string, StudentLessonContext>()
     lessonQueries.forEach((query, index) => {
       const parent = modules[index]
@@ -48,10 +50,24 @@ export function useStudentLessonContexts(courses: CourseDTO[]) {
         lessonID: lesson.id,
         lessonTitle: lesson.title,
         moduleTitle: parent.module.title,
+        moduleOrder: parent.module.order,
+        lessonOrder: lesson.order,
         courseID: parent.course.id,
         courseTitle: parent.course.title,
       }))
     })
     return contexts
   }, [lessonQueries, modules])
+
+  return {
+    contexts,
+    isLoading: moduleQueries.some((query) => query.isLoading || query.isPending)
+      || lessonQueries.some((query) => query.isLoading || query.isPending),
+    isError: moduleQueries.some((query) => query.isError) || lessonQueries.some((query) => query.isError),
+  }
+}
+
+/** Preserves the original lookup-only API for existing dashboard consumers. */
+export function useStudentLessonContexts(courses: CourseDTO[]) {
+  return useStudentLessonContextsState(courses).contexts
 }

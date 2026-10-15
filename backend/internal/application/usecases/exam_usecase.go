@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -18,6 +19,10 @@ type ExamUseCase struct {
 	grantRepo   repositories.ExtraAttemptGrantRepository
 	courseRepo  repositories.CourseRepository
 }
+
+// attemptGracePeriod is evaluated on the server for every transition. Browser
+// timers are purely presentational and cannot change an attempt's state.
+const attemptGracePeriod = time.Minute
 
 func NewExamUseCase(
 	examRepo repositories.ExamRepository,
@@ -118,15 +123,21 @@ func (uc *ExamUseCase) UpdateExam(ctx context.Context, id, orgID uuid.UUID, req 
 	if err != nil {
 		return nil, err
 	}
+	var normalizedAssessmentType *string
+	if req.AssessmentType != nil {
+		value, err := normalizeAssessmentType(*req.AssessmentType)
+		if err != nil {
+			return nil, err
+		}
+		normalizedAssessmentType = &value
+	}
+	definitionChanged := examDefinitionWouldChange(existing, req, normalizedAssessmentType)
 
 	if req.Title != nil {
 		existing.Title = *req.Title
 	}
-	if req.AssessmentType != nil {
-		assessmentType, err := normalizeAssessmentType(*req.AssessmentType)
-		if err != nil {
-			return nil, err
-		}
+	if normalizedAssessmentType != nil {
+		assessmentType := *normalizedAssessmentType
 		if assessmentType != "other" && assessmentType != existing.AssessmentType {
 			exams, err := uc.examRepo.FindByCourse(ctx, existing.CourseID, orgID)
 			if err != nil {
@@ -180,9 +191,15 @@ func (uc *ExamUseCase) UpdateExam(ctx context.Context, id, orgID uuid.UUID, req 
 		existing.Questions = nil
 	}
 
-	existing.UpdatedAt = time.Now()
-	if err := uc.examRepo.Update(ctx, existing); err != nil {
+	updated, err := uc.examRepo.UpdateWithAttemptGuard(ctx, existing, definitionChanged)
+	if errors.Is(err, repositories.ErrExamConfigurationChanged) {
+		return nil, apperrors.ValidationError("exam was changed concurrently; reload and retry")
+	}
+	if err != nil {
 		return nil, err
+	}
+	if !updated {
+		return nil, apperrors.ValidationError("questions and scoring cannot change after a student has started this exam")
 	}
 	return toExamDTO(existing, true), nil
 }
@@ -205,73 +222,50 @@ func normalizeAssessmentType(value string) (string, error) {
 }
 
 func (uc *ExamUseCase) StartAttempt(ctx context.Context, examID, studentID, orgID uuid.UUID) (*dto.StartAttemptResponse, error) {
-	exam, err := uc.examRepo.FindByID(ctx, examID, orgID)
-	if err != nil {
-		return nil, err
-	}
-
-	if exam.DueDate != nil && time.Now().After(*exam.DueDate) {
-		return nil, apperrors.ValidationError("exam due date has passed")
-	}
-	if isScheduledAssessment(exam.AssessmentType) && exam.DueDate == nil {
-		return nil, apperrors.ValidationError("this assessment has not been scheduled yet")
-	}
-
-	// Idempotent: return existing in_progress attempt
-	active, err := uc.attemptRepo.FindActiveAttempt(ctx, examID, studentID)
-	if err != nil {
-		return nil, err
-	}
-	if active != nil {
-		return &dto.StartAttemptResponse{
-			AttemptID:    active.ID.String(),
-			ExamID:       exam.ID.String(),
-			StartedAt:    active.StartedAt,
-			ExpiresAt:    active.ExpiresAt,
-			SavedAnswers: toExamMCQAnswerInputs(active.MCQAnswers),
-			Exam:         toExamDTO(exam, false),
-		}, nil
-	}
-
-	// Check attempt limit
-	count, err := uc.attemptRepo.CountByExamAndStudent(ctx, examID, studentID)
-	if err != nil {
-		return nil, err
-	}
 	grants, err := uc.grantRepo.SumByExamAndStudent(ctx, examID, studentID)
 	if err != nil {
 		return nil, err
 	}
-	if count >= exam.MaxAttempts+grants {
-		return nil, apperrors.ValidationError("maximum attempts reached")
+	// If a coordinated editor wins between this read and attempt admission, the
+	// repository returns ErrExamConfigurationChanged while still holding the
+	// shared lock. Re-read and retry so a student never starts the stale version.
+	for retry := 0; retry < 3; retry++ {
+		exam, err := uc.examRepo.FindByID(ctx, examID, orgID)
+		if err != nil {
+			return nil, err
+		}
+		now := time.Now().UTC()
+		allowNewAttempt := (exam.DueDate == nil || !now.After(*exam.DueDate)) &&
+			(!isScheduledAssessment(exam.AssessmentType) || exam.DueDate != nil)
+		candidate := &entities.ExamAttempt{
+			ID:         uuid.New(),
+			ExamID:     examID,
+			StudentID:  studentID,
+			OrgID:      orgID,
+			Status:     "in_progress",
+			StartedAt:  now,
+			ExpiresAt:  now.Add(time.Duration(exam.DurationMinutes) * time.Minute),
+			FilePoints: exam.FilePoints,
+			CreatedAt:  now,
+			UpdatedAt:  now,
+		}
+		attempt, err := uc.attemptRepo.StartOrResume(ctx, candidate, exam.MaxAttempts+grants, allowNewAttempt, now, &exam.UpdatedAt)
+		if errors.Is(err, repositories.ErrExamConfigurationChanged) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		return &dto.StartAttemptResponse{
+			AttemptID:    attempt.ID.String(),
+			ExamID:       exam.ID.String(),
+			StartedAt:    attempt.StartedAt,
+			ExpiresAt:    attempt.ExpiresAt,
+			SavedAnswers: toExamMCQAnswerInputs(attempt.MCQAnswers),
+			Exam:         toExamDTO(exam, false),
+		}, nil
 	}
-
-	now := time.Now()
-	attempt := &entities.ExamAttempt{
-		ID:         uuid.New(),
-		ExamID:     examID,
-		StudentID:  studentID,
-		OrgID:      orgID,
-		Status:     "in_progress",
-		StartedAt:  now,
-		ExpiresAt:  now.Add(time.Duration(exam.DurationMinutes) * time.Minute),
-		FilePoints: exam.FilePoints,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	}
-
-	if err := uc.attemptRepo.Create(ctx, attempt); err != nil {
-		return nil, err
-	}
-
-	return &dto.StartAttemptResponse{
-		AttemptID:    attempt.ID.String(),
-		ExamID:       exam.ID.String(),
-		StartedAt:    attempt.StartedAt,
-		ExpiresAt:    attempt.ExpiresAt,
-		SavedAnswers: []dto.ExamMCQAnswerInput{},
-		Exam:         toExamDTO(exam, false),
-	}, nil
+	return nil, apperrors.ValidationError("exam configuration is being updated; retry starting the exam")
 }
 
 // SaveDraft persists an in-progress MCQ attempt without grading it. Reloading
@@ -287,10 +281,11 @@ func (uc *ExamUseCase) SaveDraft(ctx context.Context, attemptID, studentID uuid.
 	if attempt.Status != "in_progress" {
 		return apperrors.ValidationError("attempt is not in progress")
 	}
-	if time.Now().After(attempt.ExpiresAt) {
-		attempt.Status = "expired"
-		attempt.UpdatedAt = time.Now()
-		_ = uc.attemptRepo.Update(ctx, attempt)
+	now := time.Now().UTC()
+	if now.After(attempt.ExpiresAt.Add(attemptGracePeriod)) {
+		if _, err := uc.attemptRepo.ExpireIfInProgress(ctx, attemptID, studentID, now); err != nil {
+			return err
+		}
 		return apperrors.ValidationError("exam time has expired")
 	}
 
@@ -301,9 +296,26 @@ func (uc *ExamUseCase) SaveDraft(ctx context.Context, attemptID, studentID uuid.
 	if err := validateExamAnswers(exam, answers); err != nil {
 		return err
 	}
-	attempt.MCQAnswers = toEntityExamMCQAnswers(answers)
-	attempt.UpdatedAt = time.Now()
-	return uc.attemptRepo.Update(ctx, attempt)
+	saved, err := uc.attemptRepo.SaveDraftIfInProgress(ctx, attemptID, studentID, toEntityExamMCQAnswers(answers), now)
+	if err != nil {
+		return err
+	}
+	if !saved {
+		latest, err := uc.attemptRepo.FindByID(ctx, attemptID)
+		if err != nil {
+			return err
+		}
+		if latest.Status == "expired" || now.After(latest.ExpiresAt.Add(attemptGracePeriod)) {
+			if latest.Status == "in_progress" {
+				if _, err := uc.attemptRepo.ExpireIfInProgress(ctx, attemptID, studentID, now); err != nil {
+					return err
+				}
+			}
+			return apperrors.ValidationError("exam time has expired")
+		}
+		return apperrors.ValidationError("attempt is no longer in progress")
+	}
+	return nil
 }
 
 func (uc *ExamUseCase) SubmitAttempt(ctx context.Context, attemptID, studentID uuid.UUID, mcqAnswers []dto.ExamMCQAnswerInput, filePath string) (*dto.ExamAttemptDTO, error) {
@@ -315,16 +327,19 @@ func (uc *ExamUseCase) SubmitAttempt(ctx context.Context, attemptID, studentID u
 	if attempt.StudentID != studentID {
 		return nil, apperrors.ForbiddenError("not your attempt")
 	}
+	if attempt.Status == "submitted" {
+		return toExamAttemptDTO(attempt), nil
+	}
 	if attempt.Status != "in_progress" {
 		return nil, apperrors.ValidationError("attempt is not in progress")
 	}
 
-	now := time.Now()
-	grace := attempt.ExpiresAt.Add(60 * time.Second)
+	now := time.Now().UTC()
+	grace := attempt.ExpiresAt.Add(attemptGracePeriod)
 	if now.After(grace) {
-		attempt.Status = "expired"
-		attempt.UpdatedAt = now
-		_ = uc.attemptRepo.Update(ctx, attempt)
+		if _, err := uc.attemptRepo.ExpireIfInProgress(ctx, attemptID, studentID, now); err != nil {
+			return nil, err
+		}
 		return nil, apperrors.ValidationError("exam time has expired")
 	}
 
@@ -384,10 +399,55 @@ func (uc *ExamUseCase) SubmitAttempt(ctx context.Context, attemptID, studentID u
 		}
 	}
 
-	if err := uc.attemptRepo.Update(ctx, attempt); err != nil {
+	submitted, err := uc.attemptRepo.SubmitIfInProgress(ctx, attempt)
+	if err != nil {
 		return nil, err
 	}
+	if !submitted {
+		latest, err := uc.attemptRepo.FindByID(ctx, attemptID)
+		if err != nil {
+			return nil, err
+		}
+		if latest.StudentID != studentID {
+			return nil, apperrors.ForbiddenError("not your attempt")
+		}
+		if latest.Status == "submitted" {
+			return toExamAttemptDTO(latest), nil
+		}
+		if latest.Status == "expired" {
+			return nil, apperrors.ValidationError("exam time has expired")
+		}
+		if now.After(latest.ExpiresAt.Add(attemptGracePeriod)) {
+			if _, err := uc.attemptRepo.ExpireIfInProgress(ctx, attemptID, studentID, now); err != nil {
+				return nil, err
+			}
+			return nil, apperrors.ValidationError("exam time has expired")
+		}
+		return nil, apperrors.ValidationError("attempt is no longer in progress")
+	}
 	return toExamAttemptDTO(attempt), nil
+}
+
+func examDefinitionWouldChange(existing *entities.Exam, req dto.UpdateExamRequest, normalizedAssessmentType *string) bool {
+	if req.Questions != nil {
+		return true
+	}
+	if req.MCQEnabled != nil && *req.MCQEnabled != existing.MCQEnabled {
+		return true
+	}
+	if req.MCQPoints != nil && *req.MCQPoints != existing.MCQPoints {
+		return true
+	}
+	if req.FileEnabled != nil && *req.FileEnabled != existing.FileEnabled {
+		return true
+	}
+	if req.FilePoints != nil && *req.FilePoints != existing.FilePoints {
+		return true
+	}
+	if normalizedAssessmentType != nil && *normalizedAssessmentType != existing.AssessmentType {
+		return true
+	}
+	return false
 }
 
 func (uc *ExamUseCase) MyAttempts(ctx context.Context, examID, studentID uuid.UUID) ([]*dto.ExamAttemptDTO, error) {

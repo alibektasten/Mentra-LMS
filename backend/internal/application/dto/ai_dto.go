@@ -33,3 +33,14 @@ type AssignmentFeedbackResponse struct {
 	Improvements []string `json:"improvements"`
 	Overall      string   `json:"overall"`
 }
+
+type GenerateTeachingPlanRequest struct {
+	Topic           string `json:"topic" binding:"required,min=3,max=240"`
+	Audience        string `json:"audience" binding:"required,min=2,max=120"`
+	DurationMinutes int    `json:"duration_minutes" binding:"required,min=10,max=300"`
+	Language        string `json:"language" binding:"required,oneof=English Russian Kazakh"`
+}
+
+type GenerateTeachingPlanResponse struct {
+	Plan string `json:"plan"`
+}

@@ -46,11 +46,14 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
   const [editVideoUrl, setEditVideoUrl] = useState(lesson.video_url ?? '')
   const [editLinkUrl, setEditLinkUrl] = useState(lesson.link_url ?? '')
   const [editFileUrl, setEditFileUrl] = useState(lesson.file_url ?? '')
+  const [editFileUploadToken, setEditFileUploadToken] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const attachInputRef = useRef<HTMLInputElement>(null)
+  const fieldID = `lesson-${lesson.id}`
 
   const { data: attachments = [] } = useAttachments('lesson', lesson.id)
   const createAttachment = useCreateAttachment()
@@ -80,13 +83,17 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
     setEditVideoUrl(lesson.video_url ?? '')
     setEditLinkUrl(lesson.link_url ?? '')
     setEditFileUrl(lesson.file_url ?? '')
+    setEditFileUploadToken('')
+    setFormError(null)
     setEditOpen(true)
   }
 
   const handleSave = async () => {
+    if (saving) return
+    setFormError(null)
     setSaving(true)
     try {
-      await updateLesson.mutateAsync({
+      const updated = await updateLesson.mutateAsync({
         id: lesson.id,
         input: {
           title: editTitle,
@@ -95,13 +102,16 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
           video_url: editVideoUrl,
           link_url: editLinkUrl,
           file_url: editFileUrl,
+          upload_token: editFileUploadToken,
         },
       })
-      onUpdate({ title: editTitle, type: editType, content: editContent, video_url: editVideoUrl, link_url: editLinkUrl, file_url: editFileUrl, _dirty: false })
+      onUpdate({ title: editTitle, type: editType, content: editContent, video_url: editVideoUrl, link_url: editLinkUrl, file_url: updated.file_url, _dirty: false })
+      setEditFileUploadToken('')
       setEditOpen(false)
       toast.success('Lesson updated')
     } catch {
       toast.error('Failed to update lesson')
+      setFormError('Could not save this lesson. Your changes are still here; try again.')
     } finally {
       setSaving(false)
     }
@@ -114,9 +124,11 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
     try {
       const result = await uploadFile(file)
       setEditFileUrl(result.path)
+      setEditFileUploadToken(result.upload_token)
       toast.success('PDF uploaded')
     } catch {
       toast.error('Failed to upload PDF')
+      setFormError('Could not upload the PDF. You can choose it and try again.')
     } finally {
       setUploading(false)
       if (pdfInputRef.current) pdfInputRef.current.value = ''
@@ -133,6 +145,7 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
         ref_type: 'lesson',
         ref_id: lesson.id,
         stored_path: result.path,
+        upload_token: result.upload_token,
         original_name: result.name,
         mime_type: file.type,
         size_bytes: file.size,
@@ -140,6 +153,7 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
       toast.success('File attached')
     } catch {
       toast.error('Failed to upload file')
+      setFormError('Could not attach the file. You can choose it and try again.')
     } finally {
       setUploading(false)
       if (attachInputRef.current) attachInputRef.current.value = ''
@@ -158,7 +172,7 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
   return (
     <>
       <div ref={setNodeRef} style={style} className="group flex items-center gap-2 rounded-md py-1.5 px-2 hover:bg-muted/50">
-        <button {...attributes} {...listeners} className="cursor-grab text-ink-subtle hover:text-ink-muted">
+        <button {...attributes} {...listeners} aria-label={`Reorder ${lesson.title}`} className="cursor-grab text-ink-subtle hover:text-ink-muted">
           <GripVertical className="h-3.5 w-3.5" />
         </button>
         <Icon className="h-3.5 w-3.5 text-ink-muted shrink-0" />
@@ -167,13 +181,13 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
           {lesson._dirty && <span className="ml-1 text-accent">•</span>}
         </span>
         <span className="text-xs text-ink-subtle capitalize">{lesson.type}</span>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handleEdit}>
+        <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={handleEdit} aria-label={`Edit ${lesson.title}`}>
             <Pencil className="h-3 w-3" />
           </Button>
           <ConfirmDialog
             trigger={
-              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive hover:text-destructive">
+              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive hover:text-destructive" aria-label={`Delete ${lesson.title}`}>
                 <Trash2 className="h-3 w-3" />
               </Button>
             }
@@ -192,14 +206,15 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
             <DialogTitle>Edit Lesson</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {formError && <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{formError}</div>}
             <div className="space-y-1.5">
-              <Label>Title</Label>
-              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+              <Label htmlFor={`${fieldID}-title`}>Title</Label>
+              <Input id={`${fieldID}-title`} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Type</Label>
+              <Label htmlFor={`${fieldID}-type`}>Type</Label>
               <Select value={editType} onValueChange={(v) => setEditType(v as LessonType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id={`${fieldID}-type`}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="text">Text</SelectItem>
                   <SelectItem value="video">Video</SelectItem>
@@ -211,21 +226,22 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
             </div>
             {editType === 'video' && (
               <div className="space-y-1.5">
-                <Label>Video URL</Label>
-                <Input value={editVideoUrl} onChange={(e) => setEditVideoUrl(e.target.value)} placeholder="https://..." />
+                <Label htmlFor={`${fieldID}-video-url`}>Video URL</Label>
+                <Input id={`${fieldID}-video-url`} value={editVideoUrl} onChange={(e) => setEditVideoUrl(e.target.value)} placeholder="https://..." />
               </div>
             )}
             {editType === 'link' && (
               <div className="space-y-1.5">
-                <Label>Link URL</Label>
-                <Input value={editLinkUrl} onChange={(e) => setEditLinkUrl(e.target.value)} placeholder="https://..." />
+                <Label htmlFor={`${fieldID}-link-url`}>Link URL</Label>
+                <Input id={`${fieldID}-link-url`} value={editLinkUrl} onChange={(e) => setEditLinkUrl(e.target.value)} placeholder="https://..." />
               </div>
             )}
             {editType === 'pdf' && (
               <div className="space-y-1.5">
-                <Label>PDF File</Label>
+                <Label htmlFor={`${fieldID}-pdf-url`}>PDF File</Label>
                 <div className="flex items-center gap-2">
                   <Input
+                    id={`${fieldID}-pdf-url`}
                     value={editFileUrl}
                     onChange={(e) => setEditFileUrl(e.target.value)}
                     placeholder="/uploads/file.pdf"
@@ -237,12 +253,14 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
                     className="gap-1.5 shrink-0"
                     onClick={() => pdfInputRef.current?.click()}
                     disabled={uploading}
+                    type="button"
                   >
                     <Upload className="h-3.5 w-3.5" />
                     {uploading ? 'Uploading…' : 'Upload'}
                   </Button>
                   <input
                     ref={pdfInputRef}
+                    id={`${fieldID}-pdf-file`}
                     type="file"
                     accept=".pdf,application/pdf"
                     className="hidden"
@@ -255,8 +273,9 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
               <QuizBuilder lessonId={lesson.id} />
             ) : (editType === 'text' || editType === 'link') && (
               <div className="space-y-1.5">
-                <Label>Content</Label>
+                <Label htmlFor={`${fieldID}-content`}>Content</Label>
                 <Textarea
+                  id={`${fieldID}-content`}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   rows={editType === 'link' ? 3 : 10}
@@ -267,19 +286,21 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Supplementary Files</Label>
+                <Label htmlFor={`${fieldID}-attachment-file`}>Supplementary Files</Label>
                 <Button
                   size="sm"
                   variant="outline"
                   className="gap-1.5 h-7 text-xs"
                   onClick={() => attachInputRef.current?.click()}
                   disabled={uploading}
+                  type="button"
                 >
                   <Upload className="h-3 w-3" />
                   {uploading ? 'Uploading…' : 'Attach File'}
                 </Button>
                 <input
                   ref={attachInputRef}
+                  id={`${fieldID}-attachment-file`}
                   type="file"
                   className="hidden"
                   onChange={handleAttachUpload}
@@ -296,6 +317,7 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
                         onClick={() => handleDeleteAttachment(a.id)}
                         className="text-ink-muted hover:text-destructive"
                         title="Remove"
+                        aria-label={`Remove ${a.original_name}`}
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -307,7 +329,7 @@ export function LessonItem({ moduleId, lesson, onUpdate, onDelete }: LessonItemP
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving || !editTitle}>
+            <Button onClick={handleSave} disabled={saving || !editTitle.trim()} aria-busy={saving}>
               {saving ? 'Saving…' : 'Save Changes'}
             </Button>
           </DialogFooter>

@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils/cn'
 import { useGenerateFlashcards } from '@/lib/queries/ai.queries'
 import { FlashcardDTO } from '@/lib/api/ai'
 import { useAttachments } from '@/lib/queries/attachments.queries'
-import { UPLOAD_BASE_URL } from '@/lib/api/client'
+import { openPrivateFile } from '@/lib/api/private-files'
 import { getApiErrorMessage } from '@/lib/api/error-message'
 
 const lessonTypeBadge: Record<LessonType, string> = {
@@ -160,10 +160,8 @@ export default function LessonPage() {
             {attachments.map((attachment) => (
               <a
                 key={attachment.id}
-                href={`${UPLOAD_BASE_URL}/${attachment.stored_path}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
+                href="#"
+                onClick={(event) => { event.preventDefault(); void openPrivateFile('attachments', attachment.id, attachment.original_name) }}
                 className="flex items-center gap-3 px-5 py-3 text-sm text-[#059669] hover:bg-[#f7f7f5] transition-colors"
               >
                 <Download className="h-3.5 w-3.5 shrink-0" />

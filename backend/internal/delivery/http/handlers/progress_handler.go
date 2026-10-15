@@ -42,7 +42,20 @@ func (h *ProgressHandler) Complete(c *gin.Context) {
 func (h *ProgressHandler) GetProgress(c *gin.Context) {
 	userID, _ := uuid.Parse(middleware.GetUserID(c))
 	orgID, _ := uuid.Parse(middleware.GetOrgID(c))
-	progresses, err := h.progressUC.GetStudentProgress(c.Request.Context(), userID, orgID)
+	var (
+		progresses []dto.ProgressDTO
+		err        error
+	)
+	if rawCourseID, present := c.GetQuery("course_id"); present {
+		courseID, parseErr := uuid.Parse(rawCourseID)
+		if parseErr != nil || courseID == uuid.Nil {
+			c.Error(apperrors.ValidationError("invalid course id"))
+			return
+		}
+		progresses, err = h.progressUC.GetStudentCourseProgress(c.Request.Context(), userID, courseID, orgID)
+	} else {
+		progresses, err = h.progressUC.GetStudentProgress(c.Request.Context(), userID, orgID)
+	}
 	if err != nil {
 		c.Error(err)
 		return

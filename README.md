@@ -106,6 +106,14 @@ The seed command resets application data before creating demonstration organisat
 
 Tenant context is selected by organisation slug (for example `/nu/login`). The API receives `X-Org-Slug`; tokens also contain organisation and role claims. Course and assessment access is checked server-side.
 
+Teachers can open an assignment's **Review submissions** link in the course
+builder to view work and save scores and feedback. The student dashboard's
+**Next step** card uses visible graded work below 70% to suggest the first
+unfinished available lesson in the same course. This is a course-level rule,
+not a topic diagnosis or an AI call; it considers the courses loaded on the
+dashboard (currently up to 20). Loading, unavailable data and missing evidence
+have separate states.
+
 ## AI configuration
 
 The provider is selected only by the backend:
@@ -129,24 +137,107 @@ Teachers and organisation administrators can create course content with AI. Stud
 
 ```bash
 # Backend unit tests
-cd backend && go test ./...
+(cd backend && go test ./...)
 
 # Frontend type check and optimised build
-cd frontend && npm run type-check && npm run build
-
-# E2E deployment smoke tests
-cd frontend && npm run test:e2e
+(cd frontend && npm run type-check && npm run build)
 ```
 
-The default Playwright suite checks API health, the sign-in form and student/teacher workspaces using local NU demo data. To run against another environment, configure `E2E_BASE_URL`, `E2E_API_URL`, `TEST_ORG` and test-account variables.
-
-Detailed course UI tests are opt-in because they depend on a selected interface language:
+Run the isolated setup from the repository root in a fresh shell:
 
 ```bash
-E2E_RUN_EXTENDED=true npm run test:e2e
+# Prepare an isolated local E2E stack (never a working or production database)
+./scripts/e2e/prepare-isolated.sh
+# Copy the export commands printed by the script into this shell, then:
+cd frontend && npm run test:e2e:smoke
 ```
 
-Any E2E test that modifies course data additionally requires `E2E_ALLOW_WRITES=true`.
+The default Playwright suite verifies health and sign-in for the student,
+teacher, organization administrator and super-administrator roles. It requires
+explicit `E2E_*` credentials and URLs printed by the isolated setup script; it
+does not fall back to a developer's active demo, staging or production session.
+The script seeds only a new `mentra-e2e` Docker project. It refuses existing
+project containers or volumes (including stopped containers and matching names
+without Compose labels), remote Docker endpoints, and failed Docker inventory
+checks. Do not rerun preparation to reset a test environment. It never resets
+the developer database. Only named test volumes are mounted; the default web
+and API ports bind to loopback at `13000` and `18080`.
+
+The isolated seed provides the following test-only accounts. These credentials
+are fixtures, not deployment credentials. Sign in at
+`http://127.0.0.1:13000/nu/login` for NU or `/kbtu/login` for KBTU; the system
+administrator uses `/login`.
+
+| Role / fixture | Organization | Email | Password |
+| --- | --- | --- | --- |
+| Student | nu | sanzhar@nu.edu.kz | password123 |
+| Teacher | nu | baurzhan@nu.edu.kz | password123 |
+| Administrator | nu | aiguerim@nu.edu.kz | password123 |
+| Other student (access checks) | nu | zhanar@nu.edu.kz | password123 |
+| Other teacher (access checks) | nu | damir@nu.edu.kz | password123 |
+| Other tenant student | kbtu | nurdaulet@kbtu.edu.kz | password123 |
+| System administrator | — | e2e-super-admin@mentra.test | e2e-super-admin-password |
+
+The preparation script prints the complete `E2E_*` exports for these accounts,
+the API URL `http://127.0.0.1:18080/api/v1`, locale and timezone. Keep those
+exports in the shell used for Playwright. The write suite includes the learning
+journey and creates uniquely named course fixtures; it does not require another
+seed between runs.
+
+Detailed course UI checks remain explicit and use a fixed locale/timezone:
+
+```bash
+E2E_RUN_EXTENDED=true npm run test:e2e:extended
+```
+
+Data-changing tests additionally require `E2E_ALLOW_WRITES=true`. Before any
+write, the guard verifies local URLs, the running Compose project and services,
+published ports, and the frontend image's API build label. Setting
+`E2E_ISOLATED=true` alone is not sufficient:
+
+```bash
+E2E_ALLOW_WRITES=true npm run test:e2e:write
+```
+
+See [frontend/tests/e2e/README.md](frontend/tests/e2e/README.md) for the
+scenario matrix and cleanup. Do not treat skipped browser tests as a successful
+deployment verification.
+
+Local acceptance on 2026-10-15 used the fresh `mentra-e2e` stack and one seed:
+
+**Follow-up acceptance is blocked:** the later course-progress, strict integer
+score and re-auth cancellation changes passed targeted code/type/unit checks,
+but their rebuilt image could not be extracted. The host data volume reported
+100% capacity (about 97 MiB free), and Docker/containerd returned input/output
+errors. The browser results below describe the preceding accepted snapshot,
+not these later changes. Existing containers and volumes were preserved; no
+prune, cleanup or second seed was performed. Restore disk/Docker storage health
+before rebuilding and running the new regressions, including
+`npx playwright test browser-session-isolation.spec.ts --project=chromium`.
+
+| Check (run in `frontend` after exporting the setup variables) | Result |
+| --- | --- |
+| `npm run test:e2e:smoke` | 6 browser tests passed |
+| `E2E_ALLOW_WRITES=true npm run test:e2e:write` | 4 passed, 1 skipped, 0 failed |
+| `npx playwright test security-session.spec.ts` | 4 adapter tests passed; not browser session tests |
+| `npm run type-check` | Passed |
+| Production frontend Docker build | Passed |
+
+The write suite covers student submission and teacher grading through the UI,
+failed-request draft retention and retry, private submission-file access, hidden
+unpublished final grades, and the recommendation card using a real zero score.
+A separate browser authoring scenario creates and saves a lesson and assignment
+at a 390px viewport, checking labels, persisted values and horizontal overflow.
+The legacy lesson-edit test skipped because its first selected course had no
+lesson; it is not counted as passed. The main journey creates its initial
+module, lesson and assignment through API fixtures.
+
+Limits: browser re-authentication/session-switch flows and Google OAuth were
+not exercised in this acceptance. This was not a complete accessibility or UX
+audit. A known display defect remains: a newly created course can show the
+student's overall completed-lesson count. A follow-up code fix is present but
+its browser verification is blocked as described above. The test stack was left running;
+there was no deployment, cleanup, or second seed.
 
 GitHub Actions runs backend tests plus frontend type checks and production builds for pull requests and updates to `main`.
 

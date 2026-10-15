@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios'
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/lib/stores/auth.store'
 import { useReAuthStore } from '@/lib/stores/reauth.store'
 
@@ -12,23 +12,32 @@ export const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Queue of pending requests awaiting re-auth
-let pendingRequests: Array<{
-  resolve: (value: string) => void
-  reject: (reason?: unknown) => void
-}> = []
+type RetriableRequest = InternalAxiosRequestConfig & { _retry?: boolean; _skipReauth?: boolean; _sessionGeneration?: number }
 
-function processQueue(token: string | null, error?: unknown) {
-  pendingRequests.forEach(({ resolve, reject }) => {
-    if (token) resolve(token)
-    else reject(error)
+let activeReauthentication: Promise<string> | null = null
+
+function requestReauthentication(): Promise<string> {
+  if (activeReauthentication) return activeReauthentication
+
+  const { user } = useAuthStore.getState()
+  if (!user?.email) return Promise.reject(new Error('Session expired. Sign in again.'))
+
+  activeReauthentication = new Promise<string>((resolve, reject) => {
+    useReAuthStore.getState().open(user.email, {
+      onSuccess: resolve,
+      onCancel: () => reject(new Error('Re-authentication cancelled')),
+    })
+  }).finally(() => {
+    activeReauthentication = null
   })
-  pendingRequests = []
+	return activeReauthentication
 }
 
 // Request interceptor: attach auth + org slug
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const { token, orgSlug } = useAuthStore.getState()
+  const { token, orgSlug, sessionGeneration } = useAuthStore.getState()
+  const request = config as RetriableRequest
+  request._sessionGeneration ??= sessionGeneration
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`
   }
@@ -41,6 +50,10 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 // Response interceptor: unwrap envelope + handle 401
 apiClient.interceptors.response.use(
   (response) => {
+    const request = response.config as RetriableRequest
+    if (request._sessionGeneration !== undefined && request._sessionGeneration !== useAuthStore.getState().sessionGeneration) {
+      return Promise.reject(new Error('Session changed while the request was running'))
+    }
     // Unwrap { data: ... } envelope (handles both object and array payloads)
     if (response.data && 'data' in response.data) {
       // Keep paginated responses intact so callers can access .meta
@@ -51,32 +64,21 @@ apiClient.interceptors.response.use(
     }
     return response
   },
-  async (error) => {
-    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean }
+  async (error: AxiosError) => {
+    const originalRequest = error.config as RetriableRequest | undefined
+	if (originalRequest?._sessionGeneration !== undefined && originalRequest._sessionGeneration !== useAuthStore.getState().sessionGeneration) {
+	  return Promise.reject(new Error('Session changed while the request was running'))
+	}
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !originalRequest._skipReauth) {
       originalRequest._retry = true
-
-      const { user } = useAuthStore.getState()
-      const email = user?.email ?? ''
-
-      return new Promise((resolve, reject) => {
-        pendingRequests.push({ resolve, reject })
-
-        useReAuthStore.getState().open(email, {
-          onSuccess: (newToken: string) => {
-            processQueue(newToken)
-            if (originalRequest.headers) {
-              (originalRequest.headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`
-            }
-            resolve(apiClient(originalRequest))
-          },
-          onCancel: () => {
-            processQueue(null, new Error('Re-authentication cancelled'))
-            reject(error)
-          },
-        })
-      })
+      const newToken = await requestReauthentication()
+      if (originalRequest._sessionGeneration !== useAuthStore.getState().sessionGeneration) {
+        return Promise.reject(new Error('Session changed during re-authentication'))
+      }
+      originalRequest.headers = originalRequest.headers ?? {}
+      originalRequest.headers.Authorization = `Bearer ${newToken}`
+      return apiClient.request(originalRequest)
     }
 
     return Promise.reject(error)

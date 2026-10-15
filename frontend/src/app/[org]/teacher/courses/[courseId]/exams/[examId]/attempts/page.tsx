@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils/cn'
+import { openPrivateFile } from '@/lib/api/private-files'
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
@@ -144,6 +145,7 @@ export default function ExamAttemptsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
+                      {attempt.file_path && <Button size="sm" variant="outline" onClick={() => openPrivateFile('exam-attempts', attempt.id, 'exam-submission').catch(() => toast.error('Не удалось скачать файл'))}>Download File</Button>}
                       {attempt.status === 'submitted' && attempt.file_path && attempt.file_score == null && (
                         <Button
                           size="sm"

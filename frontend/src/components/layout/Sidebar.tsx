@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import {
   LayoutDashboard, BookOpen, Users, BarChart2, Sparkles, Settings,
-  GraduationCap, Award, ClipboardCheck, User, X,
+  GraduationCap, Award, ClipboardCheck, CalendarDays, User, X,
 } from 'lucide-react'
 import { useAuthStore } from '@/lib/stores/auth.store'
 import { NavItem } from './NavItem'
@@ -35,6 +35,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const teacherNav = [
     { href: `/${org}/teacher`, label: t('dashboard'), icon: LayoutDashboard },
     { href: `/${org}/teacher/courses`, label: t('myCourses'), icon: BookOpen },
+    { href: `/${org}/teacher/calendar`, label: 'Календарь', icon: CalendarDays },
     { href: `/${org}/teacher/students`, label: t('students'), icon: Users },
     { href: `/${org}/teacher/analytics`, label: t('analytics'), icon: BarChart2 },
     { href: `/${org}/teacher/ai`, label: t('ai'), icon: Sparkles },

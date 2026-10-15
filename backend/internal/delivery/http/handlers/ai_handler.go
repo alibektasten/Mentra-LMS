@@ -132,3 +132,17 @@ func (h *AIHandler) GenerateFlashcards(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": flashcards})
 }
+
+func (h *AIHandler) GenerateTeachingPlan(c *gin.Context) {
+	var req dto.GenerateTeachingPlanRequest
+	if err := bindJSON(c, &req); err != nil {
+		c.Error(err)
+		return
+	}
+	plan, err := h.aiUC.GenerateTeachingPlan(c.Request.Context(), req.Topic, req.Audience, req.Language, req.DurationMinutes)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": plan})
+}

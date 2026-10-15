@@ -478,7 +478,7 @@ func TestExamUseCase_UpdateExam_Success(t *testing.T) {
 	exam.UpdatedAt = time.Now()
 
 	examRepo.On("FindByID", mock.Anything, exam.ID, orgID).Return(exam, nil)
-	examRepo.On("Update", mock.Anything, mock.AnythingOfType("*entities.Exam")).Return(nil)
+	examRepo.On("UpdateWithAttemptGuard", mock.Anything, mock.AnythingOfType("*entities.Exam"), false).Return(true, nil)
 
 	newTitle := "Updated Exam"
 	result, err := uc.UpdateExam(context.Background(), exam.ID, orgID, dto.UpdateExamRequest{Title: &newTitle})
@@ -519,11 +519,11 @@ func TestExamUseCase_GradeFileSection_FileOnly(t *testing.T) {
 	graderID := uuid.New()
 
 	attempt := &entities.ExamAttempt{
-		ID:        uuid.New(),
-		ExamID:    exam.ID,
-		OrgID:     orgID,
-		Status:    "submitted",
-		FilePath:  "uploads/file.pdf",
+		ID:         uuid.New(),
+		ExamID:     exam.ID,
+		OrgID:      orgID,
+		Status:     "submitted",
+		FilePath:   "uploads/file.pdf",
 		FilePoints: exam.FilePoints,
 	}
 
@@ -565,7 +565,7 @@ func TestExamUseCase_SubmitAttempt_BothSections_NoTotalUntilFileGraded(t *testin
 
 	attemptRepo.On("FindByID", mock.Anything, attempt.ID).Return(attempt, nil)
 	examRepo.On("FindByID", mock.Anything, exam.ID, orgID).Return(exam, nil)
-	attemptRepo.On("Update", mock.Anything, mock.AnythingOfType("*entities.ExamAttempt")).Return(nil)
+	attemptRepo.On("SubmitIfInProgress", mock.Anything, mock.AnythingOfType("*entities.ExamAttempt")).Return(true, nil)
 
 	// Submit with file path + MCQ answers — total should NOT be set yet (waiting for file grade)
 	result, err := uc.SubmitAttempt(context.Background(), attempt.ID, studentID,
@@ -618,7 +618,7 @@ func TestExamUseCase_SubmitAttempt_Partial(t *testing.T) {
 
 	attemptRepo.On("FindByID", mock.Anything, attempt.ID).Return(attempt, nil)
 	examRepo.On("FindByID", mock.Anything, exam.ID, orgID).Return(exam, nil)
-	attemptRepo.On("Update", mock.Anything, mock.AnythingOfType("*entities.ExamAttempt")).Return(nil)
+	attemptRepo.On("SubmitIfInProgress", mock.Anything, mock.AnythingOfType("*entities.ExamAttempt")).Return(true, nil)
 
 	result, err := uc.SubmitAttempt(context.Background(), attempt.ID, studentID,
 		[]dto.ExamMCQAnswerInput{{QuestionID: questionID1, AnswerID: correctAnswerID}}, "")
@@ -641,7 +641,7 @@ func TestExamUseCase_UpdateExam_DisableMCQ_RemovesQuestions(t *testing.T) {
 	exam := makeExamWithQuestions(orgID, courseID, true, true) // both enabled
 
 	examRepo.On("FindByID", mock.Anything, exam.ID, orgID).Return(exam, nil)
-	examRepo.On("Update", mock.Anything, mock.AnythingOfType("*entities.Exam")).Return(nil)
+	examRepo.On("UpdateWithAttemptGuard", mock.Anything, mock.AnythingOfType("*entities.Exam"), true).Return(true, nil)
 
 	mcqDisabled := false
 	result, err := uc.UpdateExam(context.Background(), exam.ID, orgID, dto.UpdateExamRequest{MCQEnabled: &mcqDisabled})
@@ -687,6 +687,7 @@ func TestExamUseCase_UpdateExam_BothSectionsDisabled_ReturnsValidation(t *testin
 	exam := makeExamWithQuestions(orgID, courseID, true, false) // only MCQ enabled
 
 	examRepo.On("FindByID", mock.Anything, exam.ID, orgID).Return(exam, nil)
+	attemptRepo.On("HasAttempts", mock.Anything, exam.ID).Return(false, nil)
 
 	// Disable MCQ (only enabled section) without enabling file
 	mcqDisabled := false

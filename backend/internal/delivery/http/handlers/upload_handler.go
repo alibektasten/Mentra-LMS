@@ -39,9 +39,15 @@ func (h *UploadHandler) Upload(c *gin.Context) {
 		c.Error(apperrors.InternalError("failed to save file: " + err.Error()))
 		return
 	}
+	uploadToken, err := h.storage.IssueUploadClaim(orgID, middleware.GetUserID(c), storedPath)
+	if err != nil {
+		c.Error(apperrors.InternalError("failed to issue upload claim"))
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{
-		"path": storedPath,
-		"name": header.Filename,
+		"path":         storedPath,
+		"name":         header.Filename,
+		"upload_token": uploadToken,
 	}})
 }

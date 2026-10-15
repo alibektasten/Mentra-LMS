@@ -13,6 +13,7 @@ export interface CreateAttachmentInput {
   ref_type: string
   ref_id: string
   stored_path: string
+  upload_token?: string
   original_name: string
   mime_type?: string
   size_bytes?: number

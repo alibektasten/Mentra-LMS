@@ -130,3 +130,11 @@ func (uc *AIUseCase) GenerateFlashcards(ctx context.Context, lessonID, orgID uui
 	}
 	return result, nil
 }
+
+func (uc *AIUseCase) GenerateTeachingPlan(ctx context.Context, topic, audience, language string, durationMinutes int) (*dto.GenerateTeachingPlanResponse, error) {
+	plan, err := uc.aiService.GenerateTeachingPlan(ctx, strings.TrimSpace(topic), strings.TrimSpace(audience), language, durationMinutes)
+	if err != nil {
+		return nil, err
+	}
+	return &dto.GenerateTeachingPlanResponse{Plan: plan}, nil
+}

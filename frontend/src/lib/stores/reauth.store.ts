@@ -23,6 +23,7 @@ export const useReAuthStore = create<ReAuthState>()((set, get) => ({
   callbacks: null,
 
   open: (email: string, callbacks?: ReAuthCallbacks) => {
+    if (get().isOpen) return
     set({ isOpen: true, prefillEmail: email, callbacks: callbacks ?? null })
   },
 

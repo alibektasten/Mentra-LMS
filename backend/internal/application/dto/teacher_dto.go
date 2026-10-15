@@ -28,3 +28,21 @@ type TeacherReviewItemDTO struct {
 	SubmittedAt     time.Time `json:"submitted_at"`
 	MaxPoints       int       `json:"max_points"`
 }
+
+// TeacherCalendarEventDTO represents one dated item on a teacher's calendar.
+// Assignment and exam events use their deadline as StartAt. Class events are
+// expanded from a group's weekly schedule for the requested date range.
+type TeacherCalendarEventDTO struct {
+	ID             string     `json:"id"`
+	ItemID         string     `json:"item_id"`
+	ItemType       string     `json:"item_type"`
+	Title          string     `json:"title"`
+	CourseID       string     `json:"course_id"`
+	CourseTitle    string     `json:"course_title"`
+	GroupID        *string    `json:"group_id,omitempty"`
+	GroupName      *string    `json:"group_name,omitempty"`
+	AssessmentType string     `json:"assessment_type,omitempty"`
+	Location       string     `json:"location,omitempty"`
+	StartAt        time.Time  `json:"start_at"`
+	EndAt          *time.Time `json:"end_at,omitempty"`
+}

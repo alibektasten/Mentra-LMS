@@ -1,7 +1,7 @@
 import { apiClient } from './client'
 import {
   GroupDTO, GroupScheduleDTO, GroupMemberDTO,
-  CreateGroupInput, UpdateGroupInput, CreateGroupScheduleInput, AddMemberInput, AssignGroupInput,
+  CreateGroupInput, UpdateGroupInput, CreateGroupScheduleInput, AddMemberInput, AssignGroupInput, AttendanceSheetDTO, SaveAttendanceInput,
 } from '@/types/group'
 
 // Org-level group management
@@ -98,5 +98,15 @@ export async function deleteSchedule(groupId: string, scheduleId: string, course
 
 export async function getMyGroup(courseId: string): Promise<GroupDTO> {
   const res = await apiClient.get<GroupDTO>(`/courses/${courseId}/my-group`)
+  return res.data
+}
+
+export async function getAttendance(courseId: string, groupId: string, date: string): Promise<AttendanceSheetDTO> {
+  const res = await apiClient.get<AttendanceSheetDTO>(`/courses/${courseId}/groups/${groupId}/attendance`, { params: { date } })
+  return { ...res.data, students: res.data.students ?? [] }
+}
+
+export async function saveAttendance(courseId: string, groupId: string, input: SaveAttendanceInput): Promise<AttendanceSheetDTO> {
+  const res = await apiClient.put<AttendanceSheetDTO>(`/courses/${courseId}/groups/${groupId}/attendance`, input)
   return res.data
 }

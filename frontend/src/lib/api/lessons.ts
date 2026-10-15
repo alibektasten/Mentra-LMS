@@ -17,7 +17,7 @@ export async function createLesson(moduleId: string, input: CreateLessonInput): 
 }
 
 export async function updateLesson(moduleId: string, lessonId: string, input: UpdateLessonInput): Promise<LessonDTO> {
-  const res = await apiClient.patch<LessonDTO>(`/modules/${moduleId}/lessons/${lessonId}`, input)
+  const res = await apiClient.put<LessonDTO>(`/modules/${moduleId}/lessons/${lessonId}`, input)
   return res.data
 }
 

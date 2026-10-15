@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"sort"
+	"time"
 
 	"github.com/ailms/backend/internal/application/dto"
 	"github.com/ailms/backend/internal/domain/entities"
@@ -16,10 +17,11 @@ type TeacherUseCase struct {
 	ctRepo         repositories.CourseTeacherRepository
 	userRepo       repositories.UserRepository
 	assignmentRepo repositories.AssignmentRepository
+	examRepo       repositories.ExamRepository
 }
 
-func NewTeacherUseCase(courseRepo repositories.CourseRepository, groupRepo repositories.GroupRepository, ctRepo repositories.CourseTeacherRepository, userRepo repositories.UserRepository, assignmentRepo repositories.AssignmentRepository) *TeacherUseCase {
-	return &TeacherUseCase{courseRepo: courseRepo, groupRepo: groupRepo, ctRepo: ctRepo, userRepo: userRepo, assignmentRepo: assignmentRepo}
+func NewTeacherUseCase(courseRepo repositories.CourseRepository, groupRepo repositories.GroupRepository, ctRepo repositories.CourseTeacherRepository, userRepo repositories.UserRepository, assignmentRepo repositories.AssignmentRepository, examRepo repositories.ExamRepository) *TeacherUseCase {
+	return &TeacherUseCase{courseRepo: courseRepo, groupRepo: groupRepo, ctRepo: ctRepo, userRepo: userRepo, assignmentRepo: assignmentRepo, examRepo: examRepo}
 }
 
 func (uc *TeacherUseCase) assignedCourses(ctx context.Context, teacherID, orgID uuid.UUID) ([]entities.Course, error) {
@@ -173,6 +175,132 @@ func (uc *TeacherUseCase) ListReviewQueue(ctx context.Context, teacherID, orgID 
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].SubmittedAt.Before(result[j].SubmittedAt) })
 	return result, nil
+}
+
+// ListCalendar returns dated coursework for courses assigned to the teacher.
+// Weekly group schedules are expanded only inside the requested date range, so
+// the API never reveals events from courses the teacher cannot access.
+func (uc *TeacherUseCase) ListCalendar(ctx context.Context, teacherID, orgID uuid.UUID, from, to time.Time) ([]dto.TeacherCalendarEventDTO, error) {
+	courses, err := uc.assignedCourses(ctx, teacherID, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	from = calendarDay(from)
+	to = calendarDay(to)
+	events := make([]dto.TeacherCalendarEventDTO, 0)
+	for _, course := range courses {
+		assignments, err := uc.assignmentRepo.FindByCourse(ctx, course.ID, orgID)
+		if err != nil {
+			return nil, err
+		}
+		for _, assignment := range assignments {
+			if assignment.DueDate == nil || !isWithinCalendarRange(*assignment.DueDate, from, to) {
+				continue
+			}
+			events = append(events, dto.TeacherCalendarEventDTO{
+				ID:          "assignment:" + assignment.ID.String(),
+				ItemID:      assignment.ID.String(),
+				ItemType:    "assignment",
+				Title:       assignment.Title,
+				CourseID:    course.ID.String(),
+				CourseTitle: course.Title,
+				StartAt:     *assignment.DueDate,
+			})
+		}
+
+		exams, err := uc.examRepo.FindByCourse(ctx, course.ID, orgID)
+		if err != nil {
+			return nil, err
+		}
+		for _, exam := range exams {
+			if exam.DueDate == nil || !isWithinCalendarRange(*exam.DueDate, from, to) {
+				continue
+			}
+			events = append(events, dto.TeacherCalendarEventDTO{
+				ID:             "exam:" + exam.ID.String(),
+				ItemID:         exam.ID.String(),
+				ItemType:       "exam",
+				Title:          exam.Title,
+				CourseID:       course.ID.String(),
+				CourseTitle:    course.Title,
+				AssessmentType: exam.AssessmentType,
+				StartAt:        *exam.DueDate,
+			})
+		}
+
+		groups, err := uc.groupRepo.ListGroupsByCourse(ctx, course.ID, orgID)
+		if err != nil {
+			return nil, err
+		}
+		for _, group := range groups {
+			schedules, err := uc.groupRepo.ListSchedulesByGroup(ctx, group.ID)
+			if err != nil {
+				return nil, err
+			}
+			for _, schedule := range schedules {
+				events = append(events, expandGroupSchedule(schedule, group, course, from, to)...)
+			}
+		}
+	}
+
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].StartAt.Equal(events[j].StartAt) {
+			if events[i].ItemType == events[j].ItemType {
+				return events[i].Title < events[j].Title
+			}
+			return events[i].ItemType < events[j].ItemType
+		}
+		return events[i].StartAt.Before(events[j].StartAt)
+	})
+	return events, nil
+}
+
+func calendarDay(value time.Time) time.Time {
+	return time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+func isWithinCalendarRange(value, from, to time.Time) bool {
+	day := calendarDay(value)
+	return !day.Before(from) && !day.After(to)
+}
+
+func expandGroupSchedule(schedule entities.GroupSchedule, group entities.Group, course entities.Course, from, to time.Time) []dto.TeacherCalendarEventDTO {
+	startClock, startErr := time.Parse("15:04", schedule.StartTime)
+	endClock, endErr := time.Parse("15:04", schedule.EndTime)
+	if startErr != nil || endErr != nil || schedule.DayOfWeek < 0 || schedule.DayOfWeek > 6 {
+		// Older or manually inserted malformed schedule rows must not make the
+		// whole calendar unavailable.
+		return nil
+	}
+
+	groupID, groupName := group.ID.String(), group.Name
+	events := make([]dto.TeacherCalendarEventDTO, 0)
+	for day := from; !day.After(to); day = day.AddDate(0, 0, 1) {
+		if int(day.Weekday()) != schedule.DayOfWeek {
+			continue
+		}
+		startAt := time.Date(day.Year(), day.Month(), day.Day(), startClock.Hour(), startClock.Minute(), 0, 0, time.UTC)
+		endAt := time.Date(day.Year(), day.Month(), day.Day(), endClock.Hour(), endClock.Minute(), 0, 0, time.UTC)
+		if !endAt.After(startAt) {
+			// Support sessions that finish after midnight.
+			endAt = endAt.AddDate(0, 0, 1)
+		}
+		events = append(events, dto.TeacherCalendarEventDTO{
+			ID:          "class:" + schedule.ID.String() + ":" + day.Format("2006-01-02"),
+			ItemID:      schedule.ID.String(),
+			ItemType:    "class",
+			Title:       group.Name,
+			CourseID:    course.ID.String(),
+			CourseTitle: course.Title,
+			GroupID:     &groupID,
+			GroupName:   &groupName,
+			Location:    schedule.Location,
+			StartAt:     startAt,
+			EndAt:       &endAt,
+		})
+	}
+	return events
 }
 
 func mapKeys(items map[string]struct{}) []string {

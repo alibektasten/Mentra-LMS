@@ -1,22 +1,42 @@
-import { test, expect } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
+import { test, expect, type APIRequestContext, type APIResponse } from '@playwright/test'
 import { loginViaAPI } from './helpers/auth'
+import { apiURL, assertIsolatedWriteTarget, isExtendedSuiteEnabled, isWriteSuiteEnabled, testCredentials, testOrg } from './helpers/environment'
+import { labels } from './helpers/locale'
 
 /**
  * Teacher course builder tests.
  *
- * Requires the standard demo seed (run `go run ./cmd/seed` from backend/).
- *
- * Override via env vars:
- *   TEST_ORG, TEST_TEACHER_EMAIL, TEST_TEACHER_PASSWORD
+ * Requires the isolated stack prepared by scripts/e2e/prepare-isolated.sh.
  */
 
-const ORG = process.env.TEST_ORG ?? 'nu'
-const EMAIL = process.env.TEST_TEACHER_EMAIL ?? 'baurzhan@nu.edu.kz'
-const PASS = process.env.TEST_TEACHER_PASSWORD ?? 'password123'
+const ORG = testOrg()
+const { email: EMAIL, password: PASS } = testCredentials('teacher')
+
+type APIEntity = { id: string }
+type TeacherSession = { token: string }
+
+async function responseData<T>(response: APIResponse, expectedStatus: number): Promise<T> {
+  expect(response.status()).toBe(expectedStatus)
+  return ((await response.json()) as { data: T }).data
+}
+
+async function teacherSession(request: APIRequestContext): Promise<TeacherSession> {
+  const login = await request.post(`${apiURL()}/auth/login`, {
+    headers: { 'X-Org-Slug': ORG },
+    data: { email: EMAIL, password: PASS },
+  })
+  const data = await responseData<{ access_token: string }>(login, 200)
+  return { token: data.access_token }
+}
+
+function teacherHeaders(session: TeacherSession) {
+  return { Authorization: `Bearer ${session.token}`, 'X-Org-Slug': ORG }
+}
 
 // See the student suite for why detailed, language-specific UI checks are
 // opt-in. The platform-smoke suite is the deployment gate.
-test.skip(process.env.E2E_RUN_EXTENDED !== 'true', 'Set E2E_RUN_EXTENDED=true to run detailed course checks')
+test.skip(!isExtendedSuiteEnabled(), 'Run the explicit extended suite with E2E_RUN_EXTENDED=true.')
 
 test.describe('Teacher — course builder', () => {
   test.beforeEach(async ({ page }) => {
@@ -48,9 +68,9 @@ test.describe('Teacher — course builder', () => {
     await firstCourse.click()
     await page.waitForLoadState('networkidle')
 
-    await expect(page.getByRole('tab', { name: 'Details' })).toBeVisible({ timeout: 10000 })
-    await expect(page.getByRole('tab', { name: 'Content Builder' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Grades' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: labels.details })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('tab', { name: labels.contentBuilder })).toBeVisible()
+    await expect(page.getByRole('tab', { name: labels.grades })).toBeVisible()
   })
 
   test('content builder has Add Module button', async ({ page }) => {
@@ -61,30 +81,36 @@ test.describe('Teacher — course builder', () => {
     test.skip(await firstCourse.count() === 0, 'No courses')
 
     await firstCourse.click()
-    await page.getByRole('tab', { name: 'Content Builder' }).click()
+    await page.getByRole('tab', { name: labels.contentBuilder }).click()
     await page.waitForTimeout(1000)
 
-    await expect(page.getByRole('button', { name: /Add Module/i })).toBeVisible({ timeout: 8000 })
+    await expect(page.getByRole('button', { name: labels.addModule })).toBeVisible({ timeout: 8000 })
   })
 
-  test('can create a new module', async ({ page }) => {
-    test.skip(process.env.E2E_ALLOW_WRITES !== 'true', 'Set E2E_ALLOW_WRITES=true to run data-changing tests')
-    await page.goto(`/${ORG}/teacher/courses`)
-    await page.waitForLoadState('networkidle')
+  test('can create a new module @write', async ({ page, request }) => {
+    test.skip(!isWriteSuiteEnabled(), 'Run the explicit write suite with E2E_ALLOW_WRITES=true.')
+    assertIsolatedWriteTarget()
+    const marker = randomUUID().slice(0, 8)
+    const session = await teacherSession(request)
+    const headers = teacherHeaders(session)
+    const course = await responseData<APIEntity>(await request.post(`${apiURL()}/courses`, {
+      headers,
+      data: { title: `E2E module add ${marker}`, description: 'Isolated browser fixture' },
+    }), 201)
 
-    const firstCourse = page.locator('a[href*="/teacher/courses/"]').first()
-    test.skip(await firstCourse.count() === 0, 'No courses')
-
-    await firstCourse.click()
-    await page.getByRole('tab', { name: 'Content Builder' }).click()
-    await page.waitForTimeout(1000)
-
-    const countBefore = await page.locator('.rounded-lg.border.bg-white.shadow-sm').count()
-    await page.getByRole('button', { name: /Add Module/i }).click()
-    await page.waitForTimeout(2000)
-
-    const countAfter = await page.locator('.rounded-lg.border.bg-white.shadow-sm').count()
-    expect(countAfter).toBeGreaterThanOrEqual(countBefore)
+    await page.goto(`/${ORG}/teacher/courses/${course.id}`)
+    await page.getByRole('tab', { name: labels.contentBuilder }).click()
+    const moduleCreated = page.waitForResponse((response) => (
+      response.url() === `${apiURL()}/courses/${course.id}/modules`
+      && response.request().method() === 'POST'
+      && response.status() === 201
+    ))
+    await page.getByRole('button', { name: labels.addModule }).click()
+    const moduleResponse = await moduleCreated
+    expect(moduleResponse.status()).toBe(201)
+    const module = ((await moduleResponse.json()) as { data: { id: string; title: string } }).data
+    const modules = await responseData<Array<{ id: string }>>(await request.get(`${apiURL()}/courses/${course.id}/modules`, { headers }), 200)
+    expect(modules.map((item) => item.id)).toContain(module.id)
   })
 
   test('lesson edit dialog opens on pencil click', async ({ page }) => {
@@ -95,7 +121,7 @@ test.describe('Teacher — course builder', () => {
     test.skip(await firstCourse.count() === 0, 'No courses')
 
     await firstCourse.click()
-    await page.getByRole('tab', { name: 'Content Builder' }).click()
+    await page.getByRole('tab', { name: labels.contentBuilder }).click()
     await page.waitForTimeout(1500)
 
     // Expand first module
@@ -125,45 +151,50 @@ test.describe('Teacher — course builder', () => {
     await expect(page.getByRole('dialog').getByLabel('Title')).toBeVisible()
   })
 
-  test('lesson edit dialog can update title', async ({ page }) => {
-    test.skip(process.env.E2E_ALLOW_WRITES !== 'true', 'Set E2E_ALLOW_WRITES=true to run data-changing tests')
-    await page.goto(`/${ORG}/teacher/courses`)
-    await page.waitForLoadState('networkidle')
+  test('lesson edit dialog persists a unique lesson title @write', async ({ page, request }) => {
+    test.skip(!isWriteSuiteEnabled(), 'Run the explicit write suite with E2E_ALLOW_WRITES=true.')
+    assertIsolatedWriteTarget()
+    const marker = randomUUID().slice(0, 8)
+    const originalTitle = `E2E lesson ${marker}`
+    const updatedTitle = `E2E lesson updated ${marker}`
+    const session = await teacherSession(request)
+    const headers = teacherHeaders(session)
 
-    const firstCourse = page.locator('a[href*="/teacher/courses/"]').first()
-    test.skip(await firstCourse.count() === 0, 'No courses')
+    const course = await responseData<APIEntity>(await request.post(`${apiURL()}/courses`, {
+      headers,
+      data: { title: `E2E lesson edit ${marker}`, description: 'Isolated browser fixture' },
+    }), 201)
+    const module = await responseData<APIEntity>(await request.post(`${apiURL()}/courses/${course.id}/modules`, {
+      headers,
+      data: { title: `E2E module ${marker}`, order: 0 },
+    }), 201)
+    const lesson = await responseData<APIEntity>(await request.post(`${apiURL()}/modules/${module.id}/lessons`, {
+      headers,
+      data: { title: originalTitle, type: 'text', content: 'Isolated lesson content', order: 0 },
+    }), 201)
 
-    await firstCourse.click()
-    await page.getByRole('tab', { name: 'Content Builder' }).click()
-    await page.waitForTimeout(1500)
+    await page.goto(`/${ORG}/teacher/courses/${course.id}`)
+    await page.getByRole('tab', { name: labels.contentBuilder }).click()
+    await page.getByRole('button', { name: `Toggle module E2E module ${marker}` }).click()
+    const editLesson = page.getByRole('button', { name: `Edit ${originalTitle}` })
+    await expect(editLesson).toBeVisible()
+    await editLesson.click()
 
-    const firstModule = page.locator('.rounded-lg.border.bg-white.shadow-sm').first()
-    test.skip(await firstModule.count() === 0, 'No modules')
+    const dialog = page.getByRole('dialog', { name: 'Edit Lesson' })
+    await expect(dialog).toBeVisible()
+    await dialog.getByLabel('Title').fill(updatedTitle)
+    const saved = page.waitForResponse((response) => (
+      response.url() === `${apiURL()}/modules/${module.id}/lessons/${lesson.id}`
+      && response.request().method() === 'PUT'
+      && response.status() === 200
+    ))
+    await dialog.getByRole('button', { name: 'Save Changes' }).click()
+    await saved
+    await expect(dialog).toBeHidden()
+    await expect(page.getByRole('button', { name: `Edit ${updatedTitle}` })).toBeVisible()
 
-    await firstModule.locator('button').nth(1).click()
-    await page.waitForTimeout(1000)
-
-    const lessonRow = page.locator('.group.flex.items-center.gap-2').first()
-    test.skip(await lessonRow.count() === 0, 'No lessons')
-
-    await lessonRow.hover()
-    await page.waitForTimeout(200)
-    await lessonRow.locator('button').nth(0).click()
-    await page.waitForTimeout(500)
-
-    const dialog = page.getByRole('dialog')
-    test.skip(await dialog.count() === 0, 'Edit dialog did not open')
-
-    const titleInput = dialog.getByLabel('Title')
-    await titleInput.clear()
-    await titleInput.fill('Updated Lesson Title')
-
-    // Save
-    await dialog.getByRole('button', { name: /Save/i }).click()
-    await page.waitForTimeout(1500)
-
-    // Dialog should close
-    await expect(dialog).not.toBeVisible({ timeout: 5000 })
+    const persisted = await responseData<{ title: string }>(await request.get(`${apiURL()}/modules/${module.id}/lessons/${lesson.id}`, { headers }), 200)
+    expect(persisted.title).toBe(updatedTitle)
   })
 
   test('grades tab shows gradebook', async ({ page }) => {
@@ -174,7 +205,7 @@ test.describe('Teacher — course builder', () => {
     test.skip(await firstCourse.count() === 0, 'No courses')
 
     await firstCourse.click()
-    await page.getByRole('tab', { name: 'Grades' }).click()
+    await page.getByRole('tab', { name: labels.grades }).click()
     await page.waitForTimeout(1000)
 
     // Either shows assignment data or empty state

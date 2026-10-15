@@ -66,6 +66,10 @@ func ConflictError(resource string) *AppError {
 	}
 }
 
+func TooManyRequestsError(msg string) *AppError {
+	return &AppError{Code: "AI_DAILY_QUOTA_EXCEEDED", Message: msg, HTTPStatus: http.StatusTooManyRequests}
+}
+
 func InternalError(msg string) *AppError {
 	return &AppError{
 		Code:       "INTERNAL_ERROR",

@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAssignment, useMySubmission, useSubmitAssignment, useDeleteMySubmission } from '@/lib/queries/assignments.queries'
 import { useAttachments } from '@/lib/queries/attachments.queries'
-import { UPLOAD_BASE_URL } from '@/lib/api/client'
+import { openPrivateFile } from '@/lib/api/private-files'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -20,8 +20,8 @@ interface AssignmentViewerProps {
 }
 
 export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
-  const { data: assignment, isLoading: loadingAssignment } = useAssignment(assignmentId)
-  const { data: submission, isLoading: loadingSubmission } = useMySubmission(assignmentId)
+  const { data: assignment, isLoading: loadingAssignment, isError: isAssignmentError, refetch: refetchAssignment } = useAssignment(assignmentId)
+  const { data: submission, isLoading: loadingSubmission, isError: isSubmissionError, refetch: refetchSubmission } = useMySubmission(assignmentId)
   const { data: attachments = [] } = useAttachments('assignment', assignmentId)
   const submitAssignment = useSubmitAssignment(assignmentId)
   const deleteMySubmission = useDeleteMySubmission(assignmentId)
@@ -30,22 +30,23 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
   const [textContent, setTextContent] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-
-  // Pre-fill form with existing submission when entering edit mode
-  useEffect(() => {
-    if (editing && submission) {
-      setTextContent(submission.text_content ?? '')
-      setLinkUrl(submission.link_url ?? '')
-      setFile(null)
-    }
-  }, [editing, submission])
 
   if (loadingAssignment) {
     return <div className="space-y-3"><Skeleton className="h-6 w-48" /><Skeleton className="h-24" /></div>
   }
 
-  if (!assignment) return null
+  if (isAssignmentError) {
+    return (
+      <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <p>Could not load this assignment. Check the connection and try again.</p>
+        <Button type="button" variant="outline" size="sm" onClick={() => void refetchAssignment()}>Try again</Button>
+      </div>
+    )
+  }
+
+  if (!assignment) return <p className="rounded-lg border border-[#e4e2de] p-4 text-sm text-ink-muted">This assignment is not available.</p>
 
   const now = new Date()
   const dueDate = assignment.due_date ? new Date(assignment.due_date) : null
@@ -55,8 +56,22 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
 
   const isGraded = submission && submission.score !== null
 
+  const beginEditing = () => {
+    setTextContent(submission?.text_content ?? '')
+    setLinkUrl(submission?.link_url ?? '')
+    setFile(null)
+    setFormError(null)
+    setEditing(true)
+  }
+
+  const cancelEditing = () => {
+    setEditing(false)
+    setFormError(null)
+  }
+
   const handleSubmit = async () => {
-    if (isLocked) return
+    if (isLocked || submitAssignment.isPending) return
+    setFormError(null)
     const formData = new FormData()
     formData.append('text_content', textContent)
     formData.append('link_url', linkUrl)
@@ -68,6 +83,7 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
       setEditing(false)
     } catch {
       toast.error('Failed to submit assignment')
+      setFormError('Could not submit your work. Your text, link, and selected file are still here; try again.')
     }
   }
 
@@ -81,17 +97,18 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
       setFile(null)
     } catch {
       toast.error('Failed to remove submission')
+      setFormError('Could not remove the submission. Try again.')
     }
   }
 
-  const showForm = !submission || editing
+  const showForm = !loadingSubmission && !isSubmissionError && (!submission || editing)
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h2 className="text-lg font-semibold">{assignment.title}</h2>
-        <div className="flex items-center gap-3 mt-1">
+        <div className="mt-1 flex flex-wrap items-center gap-3">
           <span className="text-sm text-ink-muted">{assignment.max_points} points</span>
           {dueDate && (
             <span className={cn(
@@ -125,10 +142,8 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
               {attachments.map((a) => (
                 <a
                   key={a.id}
-                  href={`${UPLOAD_BASE_URL}/${a.stored_path}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
+                  href="#"
+                  onClick={(event) => { event.preventDefault(); void openPrivateFile('attachments', a.id, a.original_name).catch(() => toast.error('Failed to download file')) }}
                   className="flex items-center gap-2 rounded-md border border-[#e4e2de] bg-white px-3 py-2 text-sm text-[#059669] hover:bg-[#f0eeeb] transition-colors"
                 >
                   <Download className="h-3.5 w-3.5 shrink-0" />
@@ -141,7 +156,16 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
       </div>
 
       {/* Deadline warning */}
-      {daysUntilDue !== null && daysUntilDue <= 2 && !isPastDue && !submission && (
+      {loadingSubmission && <div className="space-y-2"><Skeleton className="h-20 w-full" /><Skeleton className="h-9 w-28" /></div>}
+
+      {isSubmissionError && (
+        <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p>Could not load your submission. It has not been treated as empty.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void refetchSubmission()}>Try again</Button>
+        </div>
+      )}
+
+      {daysUntilDue !== null && daysUntilDue <= 2 && !isPastDue && !submission && !loadingSubmission && !isSubmissionError && (
         <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           Due in {daysUntilDue === 0 ? 'less than a day' : `${daysUntilDue} day${daysUntilDue !== 1 ? 's' : ''}`}
@@ -149,7 +173,7 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
       )}
 
       {/* Locked state */}
-      {isLocked && !submission && (
+      {isLocked && !submission && !loadingSubmission && !isSubmissionError && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           The deadline has passed and late submissions are not allowed.
         </div>
@@ -177,7 +201,8 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
                   variant="ghost"
                   size="sm"
                   className="h-7 w-7 p-0 text-[#6b6b6b] hover:text-[#1a1a1a]"
-                  onClick={() => setEditing(true)}
+                  onClick={beginEditing}
+                  aria-label="Edit submission"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
@@ -187,6 +212,7 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0 text-[#6b6b6b] hover:text-red-600"
+                      aria-label="Remove submission"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -252,10 +278,8 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
                   Attached File
                 </div>
                 <a
-                  href={`${UPLOAD_BASE_URL}/${submission.file_path}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
+                  href="#"
+                  onClick={(event) => { event.preventDefault(); void openPrivateFile('submissions', submission.id, submission.file_path.split('/').pop() ?? 'submission').catch(() => toast.error('Failed to download file')) }}
                   className="text-sm text-[#059669] hover:underline flex items-center gap-1"
                 >
                   {submission.file_path.split('/').pop()}
@@ -263,6 +287,12 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {formError && !showForm && (
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {formError}
         </div>
       )}
 
@@ -282,7 +312,7 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
               {editing ? 'Edit Submission' : 'Submit Your Work'}
             </h3>
             {editing && (
-              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setEditing(false)}>
+              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={cancelEditing}>
                 Cancel
               </Button>
             )}
@@ -308,15 +338,16 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label>File Upload (optional)</Label>
+            <Label htmlFor="submission-file">File Upload (optional)</Label>
             <input
               ref={fileRef}
+              id="submission-file"
               type="file"
               className="hidden"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} type="button">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} type="button" aria-controls="submission-file">
                 Choose File
               </Button>
               {file ? (
@@ -328,10 +359,17 @@ export function AssignmentViewer({ assignmentId }: AssignmentViewerProps) {
               ) : null}
             </div>
           </div>
+          {formError && (
+            <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              <p>{formError}</p>
+              {showForm && <Button type="button" variant="link" className="mt-1 h-auto p-0 text-red-800" onClick={handleSubmit} disabled={submitAssignment.isPending}>Try submitting again</Button>}
+            </div>
+          )}
           <Button
             onClick={handleSubmit}
             disabled={submitAssignment.isPending || (!textContent && !linkUrl && !file)}
             className="bg-[#059669] hover:bg-[#047857] text-white"
+            aria-busy={submitAssignment.isPending}
           >
             {submitAssignment.isPending
               ? 'Saving…'

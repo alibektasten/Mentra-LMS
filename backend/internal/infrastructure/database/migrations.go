@@ -365,6 +365,72 @@ type CertificateModel struct {
 
 func (CertificateModel) TableName() string { return "certificates" }
 
+// AIDailyUsageModel is a database-backed daily quota counter. The composite
+// unique key is the conflict target for atomic increments across app restarts
+// and horizontally scaled API instances.
+type AIDailyUsageModel struct {
+	OrgID     string    `gorm:"type:uuid;not null;uniqueIndex:idx_ai_daily_usage_org_user_day"`
+	UserID    string    `gorm:"type:uuid;not null;uniqueIndex:idx_ai_daily_usage_org_user_day"`
+	UsageDate time.Time `gorm:"type:date;not null;uniqueIndex:idx_ai_daily_usage_org_user_day"`
+	Count     int       `gorm:"not null;default:0"`
+	UpdatedAt time.Time `gorm:"not null"`
+}
+
+func (AIDailyUsageModel) TableName() string { return "ai_daily_usage" }
+
+// CourseGradeModel contains the teacher-managed publication and adjustment
+// state for a student's course result. The calculated component scores remain
+// in submissions and attempts.
+type CourseGradeModel struct {
+	ID                   string `gorm:"type:uuid;primaryKey"`
+	CourseID             string `gorm:"type:uuid;not null;uniqueIndex:idx_course_grade_student"`
+	StudentID            string `gorm:"type:uuid;not null;uniqueIndex:idx_course_grade_student"`
+	OrgID                string `gorm:"type:uuid;not null;index"`
+	OverrideGrade        *float64
+	OverrideNote         string `gorm:"type:text"`
+	PublishedAt          *time.Time
+	PublishedBy          *string `gorm:"type:uuid"`
+	PublicationChangedAt *time.Time
+	PublicationChangedBy *string `gorm:"type:uuid"`
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+}
+
+func (CourseGradeModel) TableName() string { return "course_grades" }
+
+// CourseGradeChangeModel is deliberately separate from CourseGradeModel so an
+// override cannot erase its own history during a later correction or removal.
+type CourseGradeChangeModel struct {
+	ID               string `gorm:"type:uuid;primaryKey"`
+	CourseGradeID    string `gorm:"type:uuid;not null;index"`
+	CourseID         string `gorm:"type:uuid;not null;index"`
+	StudentID        string `gorm:"type:uuid;not null;index"`
+	OrgID            string `gorm:"type:uuid;not null;index"`
+	ChangedBy        string `gorm:"type:uuid;not null"`
+	Action           string `gorm:"not null"`
+	PreviousOverride *float64
+	NewOverride      *float64
+	Reason           string `gorm:"type:text;not null"`
+	CreatedAt        time.Time
+}
+
+func (CourseGradeChangeModel) TableName() string { return "course_grade_changes" }
+
+type AttendanceRecordModel struct {
+	ID        string    `gorm:"type:uuid;primaryKey"`
+	GroupID   string    `gorm:"type:uuid;not null;uniqueIndex:idx_attendance_group_student_day"`
+	StudentID string    `gorm:"type:uuid;not null;uniqueIndex:idx_attendance_group_student_day"`
+	OrgID     string    `gorm:"type:uuid;not null;index"`
+	Date      time.Time `gorm:"type:date;not null;uniqueIndex:idx_attendance_group_student_day"`
+	Status    string    `gorm:"not null"`
+	MarkedBy  string    `gorm:"type:uuid;not null"`
+	MarkedAt  time.Time `gorm:"not null"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (AttendanceRecordModel) TableName() string { return "attendance_records" }
+
 func RunMigrations(db *gorm.DB) error {
 	err := db.AutoMigrate(
 		&UserModel{},
@@ -393,9 +459,65 @@ func RunMigrations(db *gorm.DB) error {
 		&CourseTeacherModel{},
 		&FlashcardDeckModel{},
 		&CertificateModel{},
+		&AIDailyUsageModel{},
+		&CourseGradeModel{},
+		&CourseGradeChangeModel{},
+		&AttendanceRecordModel{},
 	)
 	if err != nil {
 		return fmt.Errorf("migration failed: %w", err)
 	}
+	if err := ensureExamAttemptIntegrity(db); err != nil {
+		return fmt.Errorf("exam attempt integrity migration failed: %w", err)
+	}
 	return nil
+}
+
+// ensureExamAttemptIntegrity preserves historical rows while making the
+// current-state invariant enforceable by PostgreSQL: a student can have only
+// one in-progress attempt for an exam. Attempts that are past their recorded
+// server deadline can be deterministically expired. If multiple still-valid
+// attempts exist, migration stops instead of choosing a winner: an operator
+// must explicitly resolve that academic conflict before re-running it.
+func ensureExamAttemptIntegrity(db *gorm.DB) error {
+	if db.Dialector.Name() != "postgres" {
+		return nil
+	}
+
+	graceCutoff := time.Now().UTC().Add(-time.Minute)
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(`
+			UPDATE exam_attempts
+			SET status = 'expired', updated_at = NOW()
+			WHERE status = 'in_progress' AND expires_at < ?
+		`, graceCutoff).Error; err != nil {
+			return err
+		}
+
+		var unresolvedDuplicateGroups int64
+		if err := tx.Raw(`
+			SELECT COUNT(*)
+			FROM (
+				SELECT exam_id, student_id
+				FROM exam_attempts
+				WHERE status = 'in_progress'
+				GROUP BY exam_id, student_id
+				HAVING COUNT(*) > 1
+			) AS duplicate_attempts
+		`).Scan(&unresolvedDuplicateGroups).Error; err != nil {
+			return err
+		}
+		if unresolvedDuplicateGroups > 0 {
+			return fmt.Errorf(
+				"cannot add idx_exam_attempt_one_in_progress: %d active exam/student duplicate group(s) require explicit academic resolution; retain every row, set the non-continuing attempt status through the approved workflow, then rerun migrations",
+				unresolvedDuplicateGroups,
+			)
+		}
+
+		return tx.Exec(`
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_exam_attempt_one_in_progress
+			ON exam_attempts (exam_id, student_id)
+			WHERE status = 'in_progress'
+		`).Error
+	})
 }

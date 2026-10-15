@@ -51,6 +51,26 @@ func (r *GORMProgressRepository) FindByUser(ctx context.Context, userID, orgID u
 	return result, nil
 }
 
+func (r *GORMProgressRepository) FindByUserAndCourse(ctx context.Context, userID, courseID, orgID uuid.UUID) ([]entities.LessonProgress, error) {
+	var models []database.LessonProgressModel
+	err := r.db.WithContext(ctx).
+		Table("lesson_progress AS progress").
+		Select("progress.*").
+		Joins("JOIN lessons AS lesson ON lesson.id = progress.lesson_id AND lesson.org_id = progress.org_id").
+		Joins("JOIN modules AS module ON module.id = lesson.module_id AND module.org_id = lesson.org_id").
+		Joins("JOIN courses AS course ON course.id = module.course_id AND course.org_id = module.org_id").
+		Where("progress.user_id = ? AND progress.org_id = ? AND course.id = ?", userID.String(), orgID.String(), courseID.String()).
+		Order("progress.created_at DESC").Find(&models).Error
+	if err != nil {
+		return nil, apperrors.InternalError(err.Error())
+	}
+	result := make([]entities.LessonProgress, len(models))
+	for i, m := range models {
+		result[i] = *toProgressEntity(&m)
+	}
+	return result, nil
+}
+
 func (r *GORMProgressRepository) Update(ctx context.Context, progress *entities.LessonProgress) error {
 	progress.UpdatedAt = time.Now()
 	return r.db.WithContext(ctx).Save(toProgressModel(progress)).Error

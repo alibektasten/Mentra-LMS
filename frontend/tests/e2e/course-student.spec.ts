@@ -1,23 +1,21 @@
 import { test, expect } from '@playwright/test'
 import { loginViaAPI } from './helpers/auth'
+import { isExtendedSuiteEnabled, testCredentials, testOrg } from './helpers/environment'
+import { labels } from './helpers/locale'
 
 /**
  * Student course page tests.
  *
- * Requires the standard demo seed (run `go run ./cmd/seed` from backend/).
- *
- * Override via env vars:
- *   TEST_ORG, TEST_STUDENT_EMAIL, TEST_STUDENT_PASSWORD
+ * Requires the isolated stack prepared by scripts/e2e/prepare-isolated.sh.
  */
 
-const ORG = process.env.TEST_ORG ?? 'nu'
-const EMAIL = process.env.TEST_STUDENT_EMAIL ?? 'sanzhar@nu.edu.kz'
-const PASS = process.env.TEST_STUDENT_PASSWORD ?? 'password123'
+const ORG = testOrg()
+const { email: EMAIL, password: PASS } = testCredentials('student')
 
 // These detailed scenarios intentionally remain opt-in while the product is
 // localized: their text assertions are useful during UI work, but are not a
 // reliable deployment gate in every supported language.
-test.skip(process.env.E2E_RUN_EXTENDED !== 'true', 'Set E2E_RUN_EXTENDED=true to run detailed course checks')
+test.skip(!isExtendedSuiteEnabled(), 'Run the explicit extended suite with E2E_RUN_EXTENDED=true.')
 
 test.describe('Student — course page', () => {
   test.beforeEach(async ({ page }) => {
@@ -51,9 +49,9 @@ test.describe('Student — course page', () => {
     await firstCourse.click()
     await page.waitForLoadState('networkidle')
 
-    await expect(page.getByRole('tab', { name: 'Content' })).toBeVisible({ timeout: 10000 })
-    await expect(page.getByRole('tab', { name: 'My Grades' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Deadlines' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: labels.content })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('tab', { name: labels.myGrades })).toBeVisible()
+    await expect(page.getByRole('tab', { name: labels.deadlines })).toBeVisible()
   })
 
   test('content tab shows module sections with collapsible headers', async ({ page }) => {
@@ -64,7 +62,7 @@ test.describe('Student — course page', () => {
     test.skip(await firstCourse.count() === 0, 'No courses enrolled')
 
     await firstCourse.click()
-    await page.getByRole('tab', { name: 'Content' }).click()
+    await page.getByRole('tab', { name: labels.content }).click()
     await page.waitForTimeout(1200)
 
     const moduleCards = page.locator('.rounded-xl.border.bg-white')
@@ -83,7 +81,7 @@ test.describe('Student — course page', () => {
     test.skip(await firstCourse.count() === 0, 'No courses enrolled')
 
     await firstCourse.click()
-    await page.getByRole('tab', { name: 'Content' }).click()
+    await page.getByRole('tab', { name: labels.content }).click()
     await page.waitForTimeout(1200)
 
     const moduleCard = page.locator('.rounded-xl.border.bg-white').first()
@@ -110,7 +108,7 @@ test.describe('Student — course page', () => {
     test.skip(await firstCourse.count() === 0, 'No courses enrolled')
 
     await firstCourse.click()
-    await page.getByRole('tab', { name: 'My Grades' }).click()
+    await page.getByRole('tab', { name: labels.myGrades }).click()
     await page.waitForTimeout(1000)
 
     const hasContent = await page.locator('.rounded-lg.border').count() > 0
@@ -126,7 +124,7 @@ test.describe('Student — course page', () => {
     test.skip(await firstCourse.count() === 0, 'No courses enrolled')
 
     await firstCourse.click()
-    await page.getByRole('tab', { name: 'Deadlines' }).click()
+    await page.getByRole('tab', { name: labels.deadlines }).click()
     await page.waitForTimeout(1000)
 
     const hasDeadlines = await page.locator('.divide-y').count() > 0
@@ -142,7 +140,7 @@ test.describe('Student — course page', () => {
     test.skip(await firstCourse.count() === 0, 'No courses enrolled')
 
     await firstCourse.click()
-    await page.getByRole('tab', { name: 'Content' }).click()
+    await page.getByRole('tab', { name: labels.content }).click()
     await page.waitForTimeout(1500)
 
     const lessonLink = page.locator('a[href*="/lessons/"]').first()

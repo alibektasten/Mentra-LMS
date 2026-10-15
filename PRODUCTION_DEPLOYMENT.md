@@ -36,7 +36,15 @@ Caddy obtains and renews the TLS certificate automatically once DNS resolves to 
 
 ## Backups and restore drill
 
-The `backup` service creates a compressed PostgreSQL dump in `data/backups/` every 24 hours by default and deletes copies older than 14 days. This protects from an accidental application-level change, but a backup stored on the same server does **not** protect against loss of the server. Copy that directory to an encrypted off-site bucket daily before considering the installation production-ready.
+The `backup` service creates a completed backup **bundle** in `data/backups/` every 24 hours by default and removes completed bundles older than 14 days. A bundle contains:
+
+- `database.dump.gz` — a gzip-compressed PostgreSQL custom-format dump;
+- `uploads.tar.gz` — uploaded files at backup time;
+- `manifest.json` — bundle version, identifier, timestamp, formats and SHA-256 checksums.
+
+Only a directory containing all three files is a completed backup. The worker writes the database and uploads archive in a hidden temporary directory, creates the manifest last, and atomically renames the complete directory. Do not restore from loose legacy archives or a directory without `manifest.json` unless you have separately verified it.
+
+This protects from application-level data loss, but a backup stored on the same server does **not** protect against loss of the server. Copy completed bundle directories to encrypted off-site storage daily before considering the installation production-ready. Off-site copying is not configured by this repository.
 
 Verify that a backup exists:
 
@@ -45,15 +53,42 @@ docker compose --env-file .env.production -f docker-compose.production.yml logs 
 ls -lh data/backups/
 ```
 
-Test restoration on a disposable server or database, never on the live database:
+### Restore into an isolated database and directory
+
+Always restore into a **new database** and **new uploads directory** first. Do not run restore commands against the live `lms` database.
+
+Choose only a completed bundle, then verify its checksums before restoring:
 
 ```bash
-gunzip -c data/backups/lms-YYYYMMDDTHHMMSSZ.sql.gz | \
-  docker compose --env-file .env.production -f docker-compose.production.yml exec -T postgres \
-  pg_restore --clean --if-exists --no-owner -U lms -d lms
+BUNDLE=data/backups/lms-YYYYMMDDTHHMMSSZ-RANDOM
+cd "$BUNDLE"
+sha256sum database.dump.gz uploads.tar.gz
+# Compare both output hashes with manifest.json.
 ```
 
+Create a disposable destination database and restore into it. The following example assumes the production Compose stack is running, but uses a separate database name:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec -T postgres \
+  createdb -U lms lms_restore_check
+
+gunzip -c "$BUNDLE/database.dump.gz" | \
+  docker compose --env-file .env.production -f docker-compose.production.yml exec -T postgres \
+  pg_restore --exit-on-error --no-owner -U lms -d lms_restore_check
+
+mkdir -p /srv/mentra-restore-check/uploads
+tar -xzf "$BUNDLE/uploads.tar.gz" -C /srv/mentra-restore-check/uploads
+```
+
+Validate row counts, constraints, identity/sequence behaviour and expected uploads in the isolated destination. Confirm ownership and read permissions for the restored uploads match the account that runs the backend before switching an application to them. Only after a documented review should an operator plan a controlled cutover; this guide intentionally contains no command that clears or overwrites the live database.
+
 Run this restore drill at least once before launch and after material database changes.
+
+### Consistency limitation
+
+The database dump and uploads archive are created sequentially, not as one storage snapshot. A complete bundle proves both archives finished and passed checksum generation; it does not guarantee they represent the identical instant if a file upload or deletion occurs between `pg_dump` and `tar`. For a strictly consistent recovery point, stop application writes using an operational maintenance window, wait for active uploads to finish, run one backup cycle, then resume writes. This repository does not enable maintenance mode automatically.
+
+Retention deletes only completed bundle directories with the `lms-*` name and known legacy archive filenames. It does not delete unrelated files in `data/backups/`.
 
 ## Smoke checks, monitoring, and alerts
 

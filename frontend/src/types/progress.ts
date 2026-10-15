@@ -4,7 +4,7 @@ export interface ProgressDTO {
   lesson_id: string
   org_id: string
   score?: number
-  completed_at?: string
+  completed_at?: string | null
   created_at: string
 }
 

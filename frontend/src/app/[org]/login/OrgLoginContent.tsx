@@ -20,7 +20,7 @@ export function OrgLoginContent() {
     if (!encoded) return
     try {
       const result = parseGoogleOAuthPayload(encoded)
-      setSession({ token: result.token, user: result.user, role: result.role, orgSlug: org, expiresAt: result.expiresAt })
+      setSession({ token: result.token, user: result.user, role: result.role, orgSlug: org, expiresAt: result.expiresAt, authProvider: 'google' })
       window.history.replaceState(null, '', window.location.pathname + window.location.search)
       router.replace(returnTo || `/${org}/${getRoleBasePath(result.role)}`)
     } catch {

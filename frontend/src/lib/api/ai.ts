@@ -14,6 +14,13 @@ export interface FlashcardDTO {
   definition: string
 }
 
+export interface GenerateTeachingPlanInput {
+  topic: string
+  audience: string
+  duration_minutes: number
+  language: 'English' | 'Russian' | 'Kazakh'
+}
+
 export async function generateQuiz(input: GenerateQuizInput): Promise<QuizDTO> {
   const res = await apiClient.post<QuizDTO>('/ai/generate-quiz', input)
   return res.data
@@ -36,5 +43,10 @@ export async function getAssignmentFeedback(submissionId: string): Promise<Assig
 
 export async function generateFlashcards(lessonId: string, numCards: number): Promise<FlashcardDTO[]> {
   const res = await apiClient.post<FlashcardDTO[]>('/ai/generate-flashcards', { lesson_id: lessonId, num_cards: numCards })
+  return res.data
+}
+
+export async function generateTeachingPlan(input: GenerateTeachingPlanInput): Promise<{ plan: string }> {
+  const res = await apiClient.post<{ plan: string }>('/ai/generate-teaching-plan', input)
   return res.data
 }

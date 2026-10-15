@@ -78,6 +78,18 @@ func (uc *ProgressUseCase) GetStudentProgress(ctx context.Context, userID, orgID
 	return result, nil
 }
 
+func (uc *ProgressUseCase) GetStudentCourseProgress(ctx context.Context, userID, courseID, orgID uuid.UUID) ([]dto.ProgressDTO, error) {
+	progresses, err := uc.progressRepo.FindByUserAndCourse(ctx, userID, courseID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]dto.ProgressDTO, len(progresses))
+	for i, p := range progresses {
+		result[i] = toProgressDTO(&p)
+	}
+	return result, nil
+}
+
 func (uc *ProgressUseCase) GetProgressInsights(ctx context.Context, userID, orgID uuid.UUID) (*dto.InsightsDTO, error) {
 	progresses, err := uc.progressRepo.FindByUser(ctx, userID, orgID)
 	if err != nil {
@@ -90,6 +102,9 @@ func (uc *ProgressUseCase) GetProgressInsights(ctx context.Context, userID, orgI
 
 	insights, err := uc.aiService.GenerateProgressInsights(ctx, progresses)
 	if err != nil {
+		if isAIBudgetError(err) {
+			return nil, err
+		}
 		insights = "Unable to generate insights at this time."
 	}
 
@@ -126,7 +141,9 @@ func (uc *ProgressUseCase) GetCoursePacing(ctx context.Context, courseID, userID
 	}
 	progressByLesson := make(map[uuid.UUID]struct{}, len(allProgress))
 	for _, p := range allProgress {
-		progressByLesson[p.LessonID] = struct{}{}
+		if p.CompletedAt != nil {
+			progressByLesson[p.LessonID] = struct{}{}
+		}
 	}
 
 	// Collect all lesson IDs per module

@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import { apiClient } from './client';
 import { AssignmentDTO, SubmissionDTO, CreateAssignmentInput, UpdateAssignmentInput } from '@/types/assignment';
 
@@ -32,9 +33,19 @@ export async function submitAssignment(id: string, formData: FormData): Promise<
   return res.data;
 }
 
-export async function getMySubmission(assignmentID: string): Promise<SubmissionDTO> {
-  const res = await apiClient.get<SubmissionDTO>(`/assignments/${assignmentID}/my-submission`);
-  return res.data;
+export async function getMySubmission(assignmentID: string): Promise<SubmissionDTO | null> {
+  try {
+    const res = await apiClient.get<SubmissionDTO>(`/assignments/${assignmentID}/my-submission`);
+    return res.data;
+  } catch (error) {
+    // The API represents an assignment with no submission yet as NOT_FOUND.
+    // Authentication, authorization, network, and server failures must still surface.
+    if (isAxiosError(error) && error.response?.status === 404) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export async function listSubmissions(assignmentID: string): Promise<SubmissionDTO[]> {

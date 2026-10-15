@@ -6,6 +6,7 @@ type CreateAttachmentRequest struct {
 	RefType      string `json:"ref_type" binding:"required"`
 	RefID        string `json:"ref_id" binding:"required"`
 	StoredPath   string `json:"stored_path" binding:"required"`
+	UploadToken  string `json:"upload_token"`
 	OriginalName string `json:"original_name" binding:"required"`
 	MimeType     string `json:"mime_type"`
 	SizeBytes    int64  `json:"size_bytes"`

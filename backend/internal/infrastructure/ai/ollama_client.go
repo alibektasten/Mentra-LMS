@@ -317,3 +317,17 @@ Provide 2-3 sentences of personalized learning insights and encouragement based 
 
 	return c.generate(ctx, prompt)
 }
+
+func (c *OllamaClient) GenerateTeachingPlan(ctx context.Context, topic, audience, language string, durationMinutes int) (string, error) {
+	prompt := fmt.Sprintf(`You are an expert instructional designer. Create a practical %d-minute lesson plan for %s on the topic "%s".
+
+Write the response in %s. Include these labelled sections:
+1. Learning objectives (3 measurable objectives)
+2. Lesson flow with minute-by-minute timing
+3. Learning activities and teacher prompts
+4. Formative assessment / exit ticket
+5. Materials and accessibility considerations
+
+Be specific, accurate, inclusive, and concise. Do not invent external resources.`, durationMinutes, audience, topic, language)
+	return c.generate(ctx, prompt)
+}

@@ -1,6 +1,11 @@
 import { Page } from '@playwright/test'
+import { apiURL } from './environment'
+import { clearClientState } from './locale'
 
-const API = process.env.TEST_API_URL ?? 'http://localhost:8080/api/v1'
+async function beginCleanSession(page: Page): Promise<void> {
+  await page.context().clearCookies()
+  await clearClientState(page)
+}
 
 /**
  * Log in via the UI login page.
@@ -12,12 +17,13 @@ export async function loginViaUI(
   email: string,
   password: string,
 ): Promise<void> {
-  await page.goto(`/${orgSlug}/login`)
+  await beginCleanSession(page)
+  await page.goto(orgSlug ? `/${orgSlug}/login` : '/login')
   await page.waitForLoadState('networkidle')
 
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)
-  await page.getByRole('button', { name: /sign in/i }).click()
+  await page.locator('button[type="submit"]').click()
 
   // Wait for navigation away from the login page
   await page.waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: 15000 })
@@ -33,8 +39,9 @@ export async function loginViaAPI(
   email: string,
   password: string,
 ): Promise<void> {
+  await beginCleanSession(page)
   // First, navigate somewhere so we can set localStorage
-  await page.goto(`/${orgSlug}/login`)
+  await page.goto(orgSlug ? `/${orgSlug}/login` : '/login')
   await page.waitForLoadState('domcontentloaded')
 
   const result = await page.evaluate(
@@ -47,7 +54,7 @@ export async function loginViaAPI(
       if (!res.ok) throw new Error(`Login failed: ${res.status}`)
       return res.json()
     },
-    { apiUrl: API, orgSlug, email, password },
+    { apiUrl: apiURL(), orgSlug, email, password },
   )
 
   const raw = result.data

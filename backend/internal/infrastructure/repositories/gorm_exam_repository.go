@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ailms/backend/internal/domain/entities"
+	domainrepos "github.com/ailms/backend/internal/domain/repositories"
 	"github.com/ailms/backend/internal/infrastructure/database"
 	apperrors "github.com/ailms/backend/pkg/errors"
 	"github.com/google/uuid"
@@ -56,75 +57,143 @@ func (r *GORMExamRepository) FindByCourse(ctx context.Context, courseID, orgID u
 }
 
 func (r *GORMExamRepository) Update(ctx context.Context, exam *entities.Exam) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var questionIDs []string
-		if err := tx.Model(&database.ExamQuestionModel{}).
-			Where("exam_id = ?", exam.ID.String()).
-			Pluck("id", &questionIDs).Error; err != nil {
+	_, err := r.UpdateWithAttemptGuard(ctx, exam, false)
+	return err
+}
+
+// UpdateWithAttemptGuard serialises a configuration edit with StartAttempt.
+// If structural fields are changing, the attempt count is checked only after
+// acquiring the same transaction-scoped lock used by StartOrResume.
+func (r *GORMExamRepository) UpdateWithAttemptGuard(ctx context.Context, exam *entities.Exam, rejectIfAttempts bool) (bool, error) {
+	updated := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := lockExamConfiguration(tx, exam.ID); err != nil {
 			return apperrors.InternalError(err.Error())
 		}
-
-		if len(questionIDs) > 0 {
-			if err := tx.Where("question_id IN ?", questionIDs).
-				Delete(&database.ExamAnswerModel{}).Error; err != nil {
+		var persisted database.ExamModel
+		err := tx.Select("updated_at").First(&persisted, "id = ? AND org_id = ?", exam.ID.String(), exam.OrgID.String()).Error
+		if err == gorm.ErrRecordNotFound {
+			return apperrors.NotFoundError("exam", exam.ID.String())
+		}
+		if err != nil {
+			return apperrors.InternalError(err.Error())
+		}
+		if !sameExamVersion(tx, persisted.UpdatedAt, exam.UpdatedAt) {
+			return domainrepos.ErrExamConfigurationChanged
+		}
+		if rejectIfAttempts {
+			var attempts int64
+			if err := tx.Model(&database.ExamAttemptModel{}).Where("exam_id = ?", exam.ID.String()).Count(&attempts).Error; err != nil {
 				return apperrors.InternalError(err.Error())
 			}
-		}
-
-		if err := tx.Where("exam_id = ?", exam.ID.String()).
-			Delete(&database.ExamQuestionModel{}).Error; err != nil {
-			return apperrors.InternalError(err.Error())
-		}
-
-		exam.UpdatedAt = time.Now()
-		examRecord := &database.ExamModel{
-			ID:              exam.ID.String(),
-			CourseID:        exam.CourseID.String(),
-			OrgID:           exam.OrgID.String(),
-			Title:           exam.Title,
-			Description:     exam.Description,
-			DurationMinutes: exam.DurationMinutes,
-			MaxAttempts:     exam.MaxAttempts,
-			DueDate:         exam.DueDate,
-			MCQEnabled:      exam.MCQEnabled,
-			MCQPoints:       exam.MCQPoints,
-			FileEnabled:     exam.FileEnabled,
-			FilePoints:      exam.FilePoints,
-			CreatedAt:       exam.CreatedAt,
-			UpdatedAt:       exam.UpdatedAt,
-		}
-		if err := tx.Save(examRecord).Error; err != nil {
-			return apperrors.InternalError(err.Error())
-		}
-
-		for _, q := range exam.Questions {
-			qModel := database.ExamQuestionModel{
-				ID:        q.ID.String(),
-				ExamID:    exam.ID.String(),
-				Question:  q.Question,
-				Position:  q.Position,
-				CreatedAt: q.CreatedAt,
-				UpdatedAt: q.UpdatedAt,
-			}
-			if err := tx.Create(&qModel).Error; err != nil {
-				return apperrors.InternalError(err.Error())
-			}
-			for _, a := range q.Answers {
-				aModel := database.ExamAnswerModel{
-					ID:         a.ID.String(),
-					QuestionID: q.ID.String(),
-					Answer:     a.Answer,
-					IsCorrect:  a.IsCorrect,
-					CreatedAt:  a.CreatedAt,
-					UpdatedAt:  a.UpdatedAt,
-				}
-				if err := tx.Create(&aModel).Error; err != nil {
-					return apperrors.InternalError(err.Error())
-				}
+			if attempts > 0 {
+				return nil
 			}
 		}
+		if err := r.updateInTransaction(tx, exam, persisted.UpdatedAt); err != nil {
+			return err
+		}
+		updated = true
 		return nil
 	})
+	if err != nil {
+		return false, err
+	}
+	return updated, nil
+}
+
+func sameExamVersion(tx *gorm.DB, persisted, expected time.Time) bool {
+	if tx.Dialector.Name() == "postgres" {
+		return persisted.UTC().Truncate(time.Microsecond).Equal(expected.UTC().Truncate(time.Microsecond))
+	}
+	return persisted.Equal(expected)
+}
+
+func nextExamVersion(tx *gorm.DB, persisted time.Time) time.Time {
+	next := time.Now().UTC()
+	if tx.Dialector.Name() != "postgres" {
+		return next
+	}
+	next = next.Truncate(time.Microsecond)
+	persisted = persisted.UTC().Truncate(time.Microsecond)
+	if !next.After(persisted) {
+		return persisted.Add(time.Microsecond)
+	}
+	return next
+}
+
+func (r *GORMExamRepository) updateInTransaction(tx *gorm.DB, exam *entities.Exam, persistedUpdatedAt time.Time) error {
+	var questionIDs []string
+	if err := tx.Model(&database.ExamQuestionModel{}).
+		Where("exam_id = ?", exam.ID.String()).
+		Pluck("id", &questionIDs).Error; err != nil {
+		return apperrors.InternalError(err.Error())
+	}
+
+	if len(questionIDs) > 0 {
+		if err := tx.Where("question_id IN ?", questionIDs).
+			Delete(&database.ExamAnswerModel{}).Error; err != nil {
+			return apperrors.InternalError(err.Error())
+		}
+	}
+
+	if err := tx.Where("exam_id = ?", exam.ID.String()).
+		Delete(&database.ExamQuestionModel{}).Error; err != nil {
+		return apperrors.InternalError(err.Error())
+	}
+
+	// The shared lock makes this monotonic timestamp a version token. Advancing
+	// it beyond the stored PostgreSQL precision prevents two adjacent edits from
+	// sharing a version and lets a stale full model be rejected above.
+	exam.UpdatedAt = nextExamVersion(tx, persistedUpdatedAt)
+	examRecord := &database.ExamModel{
+		ID:              exam.ID.String(),
+		CourseID:        exam.CourseID.String(),
+		OrgID:           exam.OrgID.String(),
+		AssessmentType:  exam.AssessmentType,
+		Title:           exam.Title,
+		Description:     exam.Description,
+		DurationMinutes: exam.DurationMinutes,
+		MaxAttempts:     exam.MaxAttempts,
+		DueDate:         exam.DueDate,
+		MCQEnabled:      exam.MCQEnabled,
+		MCQPoints:       exam.MCQPoints,
+		FileEnabled:     exam.FileEnabled,
+		FilePoints:      exam.FilePoints,
+		CreatedAt:       exam.CreatedAt,
+		UpdatedAt:       exam.UpdatedAt,
+	}
+	if err := tx.Save(examRecord).Error; err != nil {
+		return apperrors.InternalError(err.Error())
+	}
+
+	for _, q := range exam.Questions {
+		qModel := database.ExamQuestionModel{
+			ID:        q.ID.String(),
+			ExamID:    exam.ID.String(),
+			Question:  q.Question,
+			Position:  q.Position,
+			CreatedAt: q.CreatedAt,
+			UpdatedAt: q.UpdatedAt,
+		}
+		if err := tx.Create(&qModel).Error; err != nil {
+			return apperrors.InternalError(err.Error())
+		}
+		for _, a := range q.Answers {
+			aModel := database.ExamAnswerModel{
+				ID:         a.ID.String(),
+				QuestionID: q.ID.String(),
+				Answer:     a.Answer,
+				IsCorrect:  a.IsCorrect,
+				CreatedAt:  a.CreatedAt,
+				UpdatedAt:  a.UpdatedAt,
+			}
+			if err := tx.Create(&aModel).Error; err != nil {
+				return apperrors.InternalError(err.Error())
+			}
+		}
+	}
+	return nil
 }
 
 func (r *GORMExamRepository) Delete(ctx context.Context, id, orgID uuid.UUID) error {

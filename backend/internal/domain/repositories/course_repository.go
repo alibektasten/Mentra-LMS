@@ -16,3 +16,11 @@ type CourseRepository interface {
 	Update(ctx context.Context, course *entities.Course) error
 	Delete(ctx context.Context, id, orgID uuid.UUID) error
 }
+
+// CourseSetupRepository is implemented by the database-backed course
+// repository. Keeping it separate preserves compatibility for lightweight
+// repositories while allowing production creation to commit the course,
+// creator assignment, and required assessments atomically.
+type CourseSetupRepository interface {
+	CreateWithAcademicSetup(ctx context.Context, course *entities.Course, teacher *entities.CourseTeacher, exams []*entities.Exam) error
+}

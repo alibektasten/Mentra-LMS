@@ -754,6 +754,7 @@ func main() {
 func wipe(db *gorm.DB, log *logger.Logger) {
 	log.Info("wiping database...")
 	err := db.Exec(`TRUNCATE TABLE
+		attendance_records,
 		lesson_progress,
 		announcements,
 		group_members,

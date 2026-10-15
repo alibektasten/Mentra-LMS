@@ -47,22 +47,36 @@ func (uc *CourseUseCase) CreateCourse(ctx context.Context, req dto.CreateCourseR
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	if err := uc.courseRepo.Create(ctx, course); err != nil {
-		return nil, err
-	}
 	// A teacher must immediately see and be able to manage the course they
 	// create. Admin-created courses also keep their creator as a collaborator.
-	if err := uc.ctRepo.Add(ctx, &entities.CourseTeacher{
+	teacher := &entities.CourseTeacher{
 		ID:         uuid.New(),
 		CourseID:   course.ID,
 		TeacherID:  creatorID,
 		OrgID:      orgID,
 		AssignedAt: time.Now(),
-	}); err != nil {
+	}
+	var assessments []*entities.Exam
+	if uc.examRepo != nil {
+		assessments = buildAssessmentPlan(course)
+	}
+	if setupRepo, ok := uc.courseRepo.(repositories.CourseSetupRepository); ok {
+		if err := setupRepo.CreateWithAcademicSetup(ctx, course, teacher, assessments); err != nil {
+			return nil, err
+		}
+		return toCourseDTO(course), nil
+	}
+
+	// Fallback for non-database adapters. Production GORM repositories use the
+	// transaction above; this path keeps legacy in-memory/test adapters usable.
+	if err := uc.courseRepo.Create(ctx, course); err != nil {
 		return nil, err
 	}
-	if uc.examRepo != nil {
-		if err := uc.createAssessmentPlan(ctx, course); err != nil {
+	if err := uc.ctRepo.Add(ctx, teacher); err != nil {
+		return nil, err
+	}
+	for _, assessment := range assessments {
+		if err := uc.examRepo.Create(ctx, assessment); err != nil {
 			return nil, err
 		}
 	}
@@ -73,7 +87,7 @@ func (uc *CourseUseCase) CreateCourse(ctx context.Context, req dto.CreateCourseR
 // placeholders. They remain unavailable to students until the teacher assigns
 // a due date, so a newly created course has a complete grading plan without
 // exposing unfinished exams.
-func (uc *CourseUseCase) createAssessmentPlan(ctx context.Context, course *entities.Course) error {
+func buildAssessmentPlan(course *entities.Course) []*entities.Exam {
 	now := time.Now()
 	plan := []struct {
 		assessmentType string
@@ -84,6 +98,7 @@ func (uc *CourseUseCase) createAssessmentPlan(ctx context.Context, course *entit
 		{"endterm", "Endterm examination", "Required endterm assessment. Set a date and add instructions or questions before scheduling."},
 		{"final", "Final examination", "Required final assessment. Set a date and add instructions or questions before scheduling."},
 	}
+	exams := make([]*entities.Exam, 0, len(plan))
 	for _, item := range plan {
 		exam := &entities.Exam{
 			ID:              uuid.New(),
@@ -99,11 +114,9 @@ func (uc *CourseUseCase) createAssessmentPlan(ctx context.Context, course *entit
 			CreatedAt:       now,
 			UpdatedAt:       now,
 		}
-		if err := uc.examRepo.Create(ctx, exam); err != nil {
-			return err
-		}
+		exams = append(exams, exam)
 	}
-	return nil
+	return exams
 }
 
 func (uc *CourseUseCase) GetCourse(ctx context.Context, id, orgID uuid.UUID) (*dto.CourseDTO, error) {

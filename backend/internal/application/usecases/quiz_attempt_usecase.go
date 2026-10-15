@@ -149,6 +149,9 @@ func (uc *QuizAttemptUseCase) GetRemediation(ctx context.Context, quizID, studen
 	if len(wrongQuestions) > 0 {
 		remediation, err = uc.aiService.GenerateRemediation(ctx, lesson.Content, wrongQuestions)
 		if err != nil {
+			if isAIBudgetError(err) {
+				return nil, err
+			}
 			remediation = "Review the lesson material again, paying close attention to the topics you found challenging."
 		}
 	}

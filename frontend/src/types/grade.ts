@@ -15,15 +15,46 @@ export interface StudentGradeDTO {
   items: GradeItemDTO[];
   total_earned: number;
   total_possible: number;
-  percentage: number;
+  percentage?: number;
   assignments_percent: number | null;
   midterm_percent: number | null;
   endterm_percent: number | null;
   final_exam_percent: number | null;
   midterm_register: number | null;
   endterm_register: number | null;
-  final_grade: number;
+  calculated_final_grade?: number;
+  final_grade?: number;
   is_final_grade_ready: boolean;
+  override_grade: number | null;
+  override_note: string;
+  is_published: boolean;
+  published_at: string | null;
+}
+
+export interface GradebookStudentDTO {
+  student_id: string;
+  student_name: string;
+  student_email: string;
+  grade: StudentGradeDTO;
+}
+
+export interface GradebookDTO {
+  course_id: string;
+  students: GradebookStudentDTO[];
+  published_count: number;
+  generated_at: string;
+}
+
+export interface UpdateCourseGradeInput {
+  override_grade?: number;
+  override_note?: string;
+  clear_override?: boolean;
+}
+
+export interface GradebookPublicationResultDTO {
+  published: boolean;
+  affected_count: number;
+  published_at: string | null;
 }
 
 export interface DeadlineItemDTO {

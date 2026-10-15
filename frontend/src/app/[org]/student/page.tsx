@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { useCourses } from '@/lib/queries/courses.queries'
 import { useProgress } from '@/lib/queries/progress.queries'
-import { useStudentLessonContexts } from '@/lib/queries/student-lesson-context.queries'
+import { useStudentLessonContextsState } from '@/lib/queries/student-lesson-context.queries'
 import { getMyGrades, getUpcomingDeadlines } from '@/lib/api/grades'
 import { gradeKeys } from '@/lib/queries/grades.queries'
 import { WelcomeHero } from '@/components/student/WelcomeHero'
@@ -14,13 +14,16 @@ import { QuickActions } from '@/components/student/QuickActions'
 import { MiniCalendar } from '@/components/student/MiniCalendar'
 import { RecentCourses } from '@/components/student/RecentCourses'
 import { ActivityFeed } from '@/components/student/ActivityFeed'
+import { NextStudyRecommendation } from '@/components/student/NextStudyRecommendation'
+import { getNextStudyRecommendation } from '@/lib/personalization/next-study-recommendation'
 
 export default function StudentDashboard() {
-  const { data: coursesData, isLoading: coursesLoading } = useCourses({ page: 1, page_size: 20 })
-  const { data: progress = [] } = useProgress()
+  const { data: coursesData, isLoading: coursesLoading, isError: coursesError } = useCourses({ page: 1, page_size: 20 })
+  const { data: progress = [], isLoading: progressLoading, isError: progressError } = useProgress()
 
   const courses = coursesData?.data ?? []
-  const lessonContexts = useStudentLessonContexts(courses)
+  const lessonContextState = useStudentLessonContextsState(courses)
+  const lessonContexts = lessonContextState.contexts
   const publishedCourses = useMemo(() => courses.filter((course) => course.status === 'published'), [courses])
   const firstCourse = courses.find((c) => c.status === 'published')
   const deadlineQueries = useQueries({
@@ -40,6 +43,12 @@ export default function StudentDashboard() {
   const gradesByCourse = useMemo(() => Object.fromEntries(
     publishedCourses.map((course, index) => [course.id, gradeQueries[index]?.data])
   ), [gradeQueries, publishedCourses])
+  const recommendationLoading = coursesLoading || progressLoading || lessonContextState.isLoading || gradeQueries.some((query) => query.isLoading || query.isPending)
+  const recommendationUnavailable = coursesError || progressError || lessonContextState.isError || gradeQueries.some((query) => query.isError)
+  const nextStudyRecommendation = useMemo(
+    () => getNextStudyRecommendation(publishedCourses, gradesByCourse, lessonContexts, progress),
+    [gradesByCourse, lessonContexts, progress, publishedCourses],
+  )
   const deadlines = useMemo(() => deadlineQueries.flatMap((query, index) => {
     const course = publishedCourses[index]
     if (!course) return []
@@ -99,6 +108,10 @@ export default function StudentDashboard() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-8">
         {/* Left column — primary content */}
         <div className="space-y-8">
+          <NextStudyRecommendation
+            recommendation={nextStudyRecommendation}
+            state={recommendationLoading ? 'loading' : recommendationUnavailable ? 'unavailable' : 'ready'}
+          />
           <RecentCourses courses={courses} isLoading={coursesLoading} gradesByCourse={gradesByCourse} />
           <ActivityFeed progress={progress} lessonContexts={lessonContexts} />
         </div>

@@ -76,13 +76,16 @@ func main() {
 	courseTeacherRepo := infraRepos.NewGORMCourseTeacherRepository(db)
 	flashcardDeckRepo := infraRepos.NewGORMFlashcardDeckRepository(db)
 	certificateRepo := infraRepos.NewGORMCertificateRepository(db)
+	courseGradeRepo := infraRepos.NewGORMCourseGradeRepository(db)
+	attendanceRepo := infraRepos.NewGORMAttendanceRepository(db)
+	aiUsageRepo := infraRepos.NewGORMAIUsageRepository(db)
 
 	// Init storage
 	uploadDir := os.Getenv("UPLOAD_DIR")
 	if uploadDir == "" {
 		uploadDir = "./uploads"
 	}
-	localStore := storage.NewLocalStorage(uploadDir)
+	localStore := storage.NewLocalStorage(uploadDir, cfg.JWT.Secret)
 
 	// Init AI service. The provider is selected server-side so API keys never
 	// reach the browser.
@@ -94,6 +97,7 @@ func main() {
 	if warmup, ok := aiService.(interface{ Warmup(context.Context) }); ok {
 		go warmup.Warmup(context.Background())
 	}
+	aiService = infraAI.NewBudgetedService(aiService, aiUsageRepo, cfg.AI.DailyRequestLimit)
 
 	seedSuperAdmin(context.Background(), userRepo, cfg, log)
 
@@ -111,14 +115,15 @@ func main() {
 	superAdminUC := usecases.NewSuperAdminUseCase(userRepo, orgRepo, memberRepo)
 	assignmentUC := usecases.NewAssignmentUseCase(assignmentRepo, moduleRepo, userRepo)
 	quizAttemptUC := usecases.NewQuizAttemptUseCase(quizAttemptRepo, quizRepo, lessonRepo, aiService)
-	gradeUC := usecases.NewGradeUseCase(assignmentRepo, quizAttemptRepo, quizRepo, memberRepo, examRepo, examAttemptRepo)
+	gradeUC := usecases.NewGradeUseCase(assignmentRepo, quizAttemptRepo, quizRepo, memberRepo, examRepo, examAttemptRepo, groupRepo, userRepo, courseGradeRepo)
 	announcementUC := usecases.NewAnnouncementUseCase(announcementRepo, courseRepo)
 	groupUC := usecases.NewGroupUseCase(groupRepo, courseRepo)
 	examUC := usecases.NewExamUseCase(examRepo, examAttemptRepo, extraAttemptGrantRepo, courseRepo)
-	teacherUC := usecases.NewTeacherUseCase(courseRepo, groupRepo, courseTeacherRepo, userRepo, assignmentRepo)
+	teacherUC := usecases.NewTeacherUseCase(courseRepo, groupRepo, courseTeacherRepo, userRepo, assignmentRepo, examRepo)
 	flashcardDeckUC := usecases.NewFlashcardDeckUseCase(flashcardDeckRepo, lessonRepo)
 	certificateUC := usecases.NewCertificateUseCase(certificateRepo, groupRepo, courseRepo, moduleRepo, lessonRepo, progressRepo, userRepo, orgRepo, courseTeacherRepo)
-	notificationUC := usecases.NewNotificationUseCase(announcementRepo, courseRepo, groupRepo, courseTeacherRepo)
+	notificationUC := usecases.NewNotificationUseCase(announcementRepo, courseRepo, groupRepo, courseTeacherRepo, moduleRepo, lessonRepo, assignmentRepo, examRepo, courseGradeRepo)
+	attendanceUC := usecases.NewAttendanceUseCase(attendanceRepo, groupRepo, userRepo)
 
 	fileAttachmentUC := usecases.NewFileAttachmentUseCase(fileAttachmentRepo)
 
@@ -128,7 +133,7 @@ func main() {
 	courseTeacherHandler := handlers.NewCourseTeacherHandler(courseTeacherUC)
 	memberHandler := handlers.NewMemberHandler(memberUC)
 	moduleHandler := handlers.NewModuleHandler(moduleUC)
-	lessonHandler := handlers.NewLessonHandler(lessonUC)
+	lessonHandler := handlers.NewLessonHandler(lessonUC, localStore)
 	aiHandler := handlers.NewAIHandler(aiUC, courseTeacherRepo, groupRepo, courseRepo, lessonRepo, moduleRepo)
 	progressHandler := handlers.NewProgressHandler(progressUC)
 	userHandler := handlers.NewUserHandler(userUC)
@@ -136,9 +141,10 @@ func main() {
 	assignmentHandler := handlers.NewAssignmentHandler(assignmentUC, localStore)
 	quizAttemptHandler := handlers.NewQuizAttemptHandler(quizAttemptUC)
 	quizHandler := handlers.NewQuizHandler(quizUC)
-	fileAttachmentHandler := handlers.NewFileAttachmentHandler(fileAttachmentUC, courseTeacherRepo, groupRepo, courseRepo, lessonRepo, moduleRepo, assignmentRepo)
+	fileAttachmentHandler := handlers.NewFileAttachmentHandler(fileAttachmentUC, courseTeacherRepo, groupRepo, courseRepo, lessonRepo, moduleRepo, assignmentRepo, localStore)
 	gradeHandler := handlers.NewGradeHandler(gradeUC)
 	uploadHandler := handlers.NewUploadHandler(localStore)
+	privateFileHandler := handlers.NewPrivateFileHandler(localStore, fileAttachmentRepo, assignmentRepo, lessonRepo, moduleRepo, examAttemptRepo, examRepo, courseRepo, groupRepo, courseTeacherRepo, userRepo)
 	announcementHandler := handlers.NewAnnouncementHandler(announcementUC)
 	groupHandler := handlers.NewGroupHandler(groupUC)
 	examHandler := handlers.NewExamHandler(examUC, localStore)
@@ -146,6 +152,7 @@ func main() {
 	flashcardDeckHandler := handlers.NewFlashcardDeckHandler(flashcardDeckUC)
 	certificateHandler := handlers.NewCertificateHandler(certificateUC)
 	notificationHandler := handlers.NewNotificationHandler(notificationUC)
+	attendanceHandler := handlers.NewAttendanceHandler(attendanceUC)
 
 	gin.SetMode(cfg.Server.Mode)
 	router := routes.NewRouter(routes.Dependencies{
@@ -165,6 +172,7 @@ func main() {
 		FileAttachmentHandler: fileAttachmentHandler,
 		GradeHandler:          gradeHandler,
 		UploadHandler:         uploadHandler,
+		PrivateFileHandler:    privateFileHandler,
 		AnnouncementHandler:   announcementHandler,
 		GroupHandler:          groupHandler,
 		ExamHandler:           examHandler,
@@ -172,7 +180,9 @@ func main() {
 		FlashcardDeckHandler:  flashcardDeckHandler,
 		CertificateHandler:    certificateHandler,
 		NotificationHandler:   notificationHandler,
+		AttendanceHandler:     attendanceHandler,
 		OrgRepo:               orgRepo,
+		MembershipRepo:        memberRepo,
 		CourseRepo:            courseRepo,
 		CourseTeacherRepo:     courseTeacherRepo,
 		GroupRepo:             groupRepo,

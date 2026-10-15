@@ -7,6 +7,7 @@ import (
 	"github.com/ailms/backend/internal/application/usecases"
 	"github.com/ailms/backend/internal/delivery/http/middleware"
 	"github.com/ailms/backend/internal/domain/repositories"
+	"github.com/ailms/backend/internal/infrastructure/storage"
 	apperrors "github.com/ailms/backend/pkg/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -20,6 +21,7 @@ type FileAttachmentHandler struct {
 	lessons          repositories.LessonRepository
 	modules          repositories.ModuleRepository
 	assignments      repositories.AssignmentRepository
+	storage          *storage.LocalStorage
 }
 
 func NewFileAttachmentHandler(
@@ -30,8 +32,9 @@ func NewFileAttachmentHandler(
 	lessons repositories.LessonRepository,
 	modules repositories.ModuleRepository,
 	assignments repositories.AssignmentRepository,
+	store ...*storage.LocalStorage,
 ) *FileAttachmentHandler {
-	return &FileAttachmentHandler{
+	h := &FileAttachmentHandler{
 		fileAttachmentUC: fileAttachmentUC,
 		courseTeachers:   courseTeachers,
 		groups:           groups,
@@ -40,6 +43,10 @@ func NewFileAttachmentHandler(
 		modules:          modules,
 		assignments:      assignments,
 	}
+	if len(store) > 0 {
+		h.storage = store[0]
+	}
+	return h
 }
 
 func (h *FileAttachmentHandler) authorizeReference(c *gin.Context, refType string, refID uuid.UUID) bool {
@@ -79,6 +86,10 @@ func (h *FileAttachmentHandler) Create(c *gin.Context) {
 		return
 	}
 	if !h.authorizeReference(c, req.RefType, refID) {
+		return
+	}
+	if h.storage == nil || h.storage.ValidateUploadClaim(middleware.GetOrgID(c), middleware.GetUserID(c), req.StoredPath, req.UploadToken) != nil {
+		c.Error(apperrors.ForbiddenError("upload is not owned by this user or its proof has expired"))
 		return
 	}
 	orgID, _ := uuid.Parse(middleware.GetOrgID(c))

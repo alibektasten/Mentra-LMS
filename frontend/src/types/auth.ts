@@ -1,4 +1,5 @@
 export type Role = 'super_admin' | 'admin' | 'teacher' | 'student'
+export type AuthProvider = 'password' | 'google'
 
 export interface UserDTO {
   id: string
@@ -21,4 +22,5 @@ export interface AuthSession {
   role: Role
   orgSlug: string
   expiresAt: string
+  authProvider?: AuthProvider
 }

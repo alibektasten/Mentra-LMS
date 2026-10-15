@@ -22,6 +22,7 @@ import { MyGrades } from '@/components/courses/MyGrades'
 import { UpcomingDeadlines } from '@/components/courses/UpcomingDeadlines'
 import { cn } from '@/lib/utils/cn'
 import { useI18n } from '@/lib/i18n'
+import { completedLessonIDs, lessonCompletion } from '@/lib/progress/course-lesson-progress'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -63,8 +64,8 @@ function ModuleSection({
   const sortedLessons = [...lessons].sort((a, b) => a.order - b.order)
   const isLoading = loadingLessons || loadingAssignments
 
-  const completed = sortedLessons.filter((l) => completedLessonIds.has(l.id)).length
-  const total = sortedLessons.length + assignments.length
+  // Assignments are listed in this module, but lesson completion only tracks lessons.
+  const { completed, total } = lessonCompletion(sortedLessons.map((lesson) => lesson.id), completedLessonIds)
 
   return (
     <div className="rounded-xl border border-[#e4e2de] bg-white overflow-hidden shadow-sm">
@@ -273,13 +274,13 @@ export default function StudentCourseDetailPage() {
   const { org, courseId } = useParams<{ org: string; courseId: string }>()
   const { data: course, isLoading: courseLoading, isError: courseError } = useCourse(courseId)
   const { data: modulesData, isLoading: modulesLoading } = useModules(courseId)
-  const { data: progressData } = useProgress(courseId)
+  const { data: progressData, isLoading: progressLoading, isError: progressError } = useProgress(courseId)
   const { data: announcementsData } = useAnnouncements(courseId)
 
   const modules = Array.isArray(modulesData) ? modulesData : []
   const sortedModules = [...modules].sort((a, b) => a.order - b.order)
   const progressList = Array.isArray(progressData) ? progressData : []
-  const completedLessonIds = new Set(progressList.map((p: { lesson_id: string }) => p.lesson_id))
+  const completedLessonIds = completedLessonIDs(progressList)
   const announcements = Array.isArray(announcementsData?.data) ? announcementsData.data : []
 
   if (courseLoading) {
@@ -325,12 +326,13 @@ export default function StudentCourseDetailPage() {
           <p className="mt-1.5 text-sm text-[#6b6b6b] leading-relaxed">{course.description}</p>
         )}
         {/* Progress indicator */}
-        {completedLessonIds.size > 0 && (
+        {!progressLoading && !progressError && (
           <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
             <CheckCircle2 className="h-3 w-3" />
             {completedLessonIds.size} lesson{completedLessonIds.size !== 1 ? 's' : ''} completed
           </div>
         )}
+        {progressError && <p role="alert" className="mt-3 text-xs text-red-700">Progress unavailable. Try refreshing this course.</p>}
       </div>
 
       <Tabs defaultValue="content">

@@ -20,7 +20,7 @@ export function LoginPageContent() {
 		try {
 			const result = parseGoogleOAuthPayload(encoded)
 			if (result.role !== 'super_admin') throw new Error('Unexpected role')
-			setSession({ token: result.token, user: result.user, role: result.role, orgSlug: '', expiresAt: result.expiresAt })
+			setSession({ token: result.token, user: result.user, role: result.role, orgSlug: '', expiresAt: result.expiresAt, authProvider: 'google' })
 			window.history.replaceState(null, '', window.location.pathname + window.location.search)
 			router.replace('/super-admin/dashboard')
 		} catch {

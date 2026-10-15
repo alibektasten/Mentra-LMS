@@ -3,9 +3,11 @@ package middleware
 import (
 	"strings"
 
+	"github.com/ailms/backend/internal/domain/entities"
+	apperrors "github.com/ailms/backend/pkg/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	apperrors "github.com/ailms/backend/pkg/errors"
+	"github.com/google/uuid"
 )
 
 type contextKey string
@@ -45,7 +47,7 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
+		if !ok || !validTokenClaims(claims) {
 			c.Error(apperrors.UnauthorizedError("invalid token claims"))
 			c.Abort()
 			return
@@ -55,6 +57,53 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 		c.Set(string(ContextKeyOrgID), claims["org_id"])
 		c.Set(string(ContextKeyRole), claims["role"])
 		c.Next()
+	}
+}
+
+// validTokenClaims makes the identity put into the request context explicit.
+// MapClaims values are untrusted input even after the token signature has been
+// checked, so accepting empty or wrong-typed claims could turn into a tenant
+// or role bypass farther down the handler chain.
+func validTokenClaims(claims jwt.MapClaims) bool {
+	if _, ok := claims["exp"].(float64); !ok {
+		return false
+	}
+	userID, ok := claims["user_id"].(string)
+	if !ok || userID == "" {
+		return false
+	}
+	parsedUserID, err := uuid.Parse(userID)
+	if err != nil || parsedUserID == uuid.Nil {
+		return false
+	}
+
+	orgID, ok := claims["org_id"].(string)
+	if !ok || orgID == "" {
+		return false
+	}
+	parsedOrgID, err := uuid.Parse(orgID)
+	if err != nil {
+		return false
+	}
+
+	role, ok := claims["role"].(string)
+	if !ok || !isKnownRole(role) {
+		return false
+	}
+	// A platform token must never be accepted by a tenant route, and tenant
+	// tokens must always be bound to a concrete organization.
+	if role == string(entities.RoleSuperAdmin) {
+		return parsedOrgID == uuid.Nil
+	}
+	return parsedOrgID != uuid.Nil
+}
+
+func isKnownRole(role string) bool {
+	switch entities.Role(role) {
+	case entities.RoleSuperAdmin, entities.RoleAdmin, entities.RoleTeacher, entities.RoleStudent:
+		return true
+	default:
+		return false
 	}
 }
 

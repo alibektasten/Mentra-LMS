@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { useReAuthStore } from '@/lib/stores/reauth.store'
 import { useAuthStore } from '@/lib/stores/auth.store'
 import { reAuthSchema, ReAuthFormData } from '@/lib/validators/auth.schema'
-import { login, superAdminLogin } from '@/lib/api/auth'
+import { getGoogleOAuthStartURL, login, superAdminLogin } from '@/lib/api/auth'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,8 +15,8 @@ import { Label } from '@/components/ui/label'
 
 export function ReAuthModal() {
   const router = useRouter()
-  const { isOpen, prefillEmail, resolve, reject } = useReAuthStore()
-  const { orgSlug, role, setSession } = useAuthStore()
+  const { isOpen, prefillEmail, resolve } = useReAuthStore()
+  const { orgSlug, role, authProvider, setSession, clearSession } = useAuthStore()
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<ReAuthFormData>({
     resolver: zodResolver(reAuthSchema),
@@ -35,6 +35,7 @@ export function ReAuthModal() {
         role: result.role,
         orgSlug: isSuperAdmin ? '' : orgSlug!,
         expiresAt: result.expiresAt,
+        authProvider: 'password',
       })
       reset()
       resolve(result.token)
@@ -45,8 +46,13 @@ export function ReAuthModal() {
   }
 
   const handleCancel = () => {
-    reject()
+    clearSession()
     router.push('/login')
+  }
+
+  const continueWithGoogle = () => {
+    if (!orgSlug && role !== 'super_admin') return
+    window.location.assign(getGoogleOAuthStartURL(orgSlug, role === 'super_admin'))
   }
 
   return (
@@ -59,10 +65,19 @@ export function ReAuthModal() {
         <DialogHeader>
           <DialogTitle>Session Expired</DialogTitle>
           <DialogDescription>
-            Your session has expired. Enter your password to continue.
+            {authProvider === 'google'
+              ? 'Sign in with Google again to continue.'
+              : 'Your session has expired. Enter your password to continue.'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {authProvider === 'google' ? (
+          <div className="space-y-4">
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={handleCancel}>Sign out</Button>
+              <Button type="button" onClick={continueWithGoogle}>Continue with Google</Button>
+            </div>
+          </div>
+        ) : <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="reauth-email">Email</Label>
             <Input id="reauth-email" value={prefillEmail} readOnly className="bg-muted" />
@@ -87,7 +102,7 @@ export function ReAuthModal() {
               {isSubmitting ? 'Signing in...' : 'Continue'}
             </Button>
           </div>
-        </form>
+        </form>}
       </DialogContent>
     </Dialog>
   )

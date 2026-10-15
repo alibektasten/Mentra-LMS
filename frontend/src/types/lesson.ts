@@ -21,6 +21,7 @@ export interface CreateLessonInput {
   video_url?: string
   link_url?: string
   file_url?: string
+  upload_token?: string
   order?: number
 }
 
@@ -31,5 +32,6 @@ export interface UpdateLessonInput {
   video_url?: string
   link_url?: string
   file_url?: string
+  upload_token?: string
   order?: number
 }

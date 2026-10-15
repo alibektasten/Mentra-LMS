@@ -26,14 +26,17 @@ type Dependencies struct {
 	FileAttachmentHandler *handlers.FileAttachmentHandler
 	GradeHandler          *handlers.GradeHandler
 	UploadHandler         *handlers.UploadHandler
+	PrivateFileHandler    *handlers.PrivateFileHandler
 	AnnouncementHandler   *handlers.AnnouncementHandler
 	GroupHandler          *handlers.GroupHandler
 	ExamHandler           *handlers.ExamHandler
 	TeacherHandler        *handlers.TeacherHandler
 	FlashcardDeckHandler  *handlers.FlashcardDeckHandler
+	AttendanceHandler     *handlers.AttendanceHandler
 	CertificateHandler    *handlers.CertificateHandler
 	NotificationHandler   *handlers.NotificationHandler
 	OrgRepo               repositories.OrganizationRepository
+	MembershipRepo        repositories.MembershipRepository
 	CourseRepo            repositories.CourseRepository
 	CourseTeacherRepo     repositories.CourseTeacherRepository
 	GroupRepo             repositories.GroupRepository
@@ -67,6 +70,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	r.GET("/healthz", health)
 
 	api := r.Group("/api/v1")
+	api.GET("/avatars/:id", deps.PrivateFileHandler.Avatar)
 	api.GET("/certificates/:code", deps.CertificateHandler.Verify)
 
 	// Super admin public login — no tenant middleware
@@ -99,7 +103,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected := api.Group("/")
 	protected.Use(
 		middleware.Auth(deps.JWTSecret),
-		middleware.Tenant(deps.OrgRepo),
+		middleware.TenantWithMembership(deps.OrgRepo, deps.MembershipRepo),
 	)
 
 	teacher := protected.Group("/teacher")
@@ -107,6 +111,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	teacher.GET("/overview", deps.TeacherHandler.Overview)
 	teacher.GET("/students", deps.TeacherHandler.Students)
 	teacher.GET("/review-queue", deps.TeacherHandler.ReviewQueue)
+	teacher.GET("/calendar", deps.TeacherHandler.Calendar)
 
 	// Courses
 	courses := protected.Group("/courses")
@@ -186,7 +191,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	// Progress
 	progress := protected.Group("/progress")
-	progress.GET("", deps.ProgressHandler.GetProgress)
+	progress.GET("", middleware.RequireOptionalProgressCourseAccess(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo), deps.ProgressHandler.GetProgress)
 	progress.GET("/insights", deps.ProgressHandler.GetInsights)
 	progress.POST("/lessons/:lessonID/complete",
 		middleware.RequireAssignedLesson(deps.CourseTeacherRepo, deps.GroupRepo, deps.CourseRepo, deps.LessonRepo, deps.ModuleRepo, "lessonID"),
@@ -197,7 +202,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	// to teachers and admins because it exposes answer keys.
 	ai := protected.Group("/ai")
 	// Model calls are costly and can be abused even by an authenticated user.
-	ai.Use(middleware.RateLimiter(6), middleware.DailyAIQuota(deps.AIRequestLimit))
+	ai.Use(middleware.RateLimiter(6))
 	ai.POST("/summarize", deps.AIHandler.SummarizeLesson)
 	ai.POST("/generate-quiz",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
@@ -205,6 +210,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	)
 	ai.POST("/assignment-feedback", deps.AIHandler.GetAssignmentFeedback)
 	ai.POST("/generate-flashcards", deps.AIHandler.GenerateFlashcards)
+	ai.POST("/generate-teaching-plan",
+		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
+		deps.AIHandler.GenerateTeachingPlan,
+	)
 
 	// Flashcard decks are learner-owned and sync across a user's devices.
 	flashcardDecks := protected.Group("/flashcard-decks")
@@ -216,11 +225,17 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	// User profile
 	protected.GET("/me", deps.UserHandler.GetMe)
 	protected.PUT("/me", deps.UserHandler.UpdateMe)
+	protected.POST("/me/avatar", middleware.RateLimiter(2), deps.PrivateFileHandler.UploadAvatar)
 	protected.GET("/certificates", deps.CertificateHandler.ListMine)
 	protected.GET("/notifications", deps.NotificationHandler.List)
 
 	// Upload
 	protected.POST("/upload", middleware.RateLimiter(2), deps.UploadHandler.Upload)
+	privateFiles := protected.Group("/files")
+	privateFiles.GET("/lessons/:id", deps.PrivateFileHandler.Lesson)
+	privateFiles.GET("/attachments/:id", deps.PrivateFileHandler.Attachment)
+	privateFiles.GET("/submissions/:id", deps.PrivateFileHandler.Submission)
+	privateFiles.GET("/exam-attempts/:id", deps.PrivateFileHandler.ExamAttempt)
 
 	// Assignments (inline in courses group — same :id wildcard for course ID)
 	courses.GET("/:id/modules/:moduleID/assignments", deps.AssignmentHandler.ListByModule)
@@ -298,6 +313,18 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	// Grades
 	courses.GET("/:id/my-grades", deps.GradeHandler.GetMyGrades)
 	courses.GET("/:id/deadlines", deps.GradeHandler.GetUpcomingDeadlines)
+	courses.GET("/:id/gradebook",
+		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
+		deps.GradeHandler.GetGradebook,
+	)
+	courses.PATCH("/:id/gradebook/students/:studentID",
+		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
+		deps.GradeHandler.UpdateGradebookStudent,
+	)
+	courses.PUT("/:id/gradebook/publication",
+		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
+		deps.GradeHandler.SetGradebookPublication,
+	)
 
 	// Announcements
 	courses.GET("/:id/announcements", deps.AnnouncementHandler.List)
@@ -351,6 +378,14 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	courses.GET("/:id/groups/:groupID/members",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
 		deps.GroupHandler.ListMembers,
+	)
+	courses.GET("/:id/groups/:groupID/attendance",
+		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
+		deps.AttendanceHandler.GetSheet,
+	)
+	courses.PUT("/:id/groups/:groupID/attendance",
+		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
+		deps.AttendanceHandler.SaveSheet,
 	)
 	courses.POST("/:id/groups/:groupID/members",
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
@@ -411,11 +446,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		middleware.RequireRole(entities.RoleTeacher, entities.RoleAdmin),
 		deps.ExamHandler.GradeFile,
 	)
-
-	// Static file serving for uploads
-	if deps.UploadDir != "" {
-		r.Static("/uploads", deps.UploadDir)
-	}
 
 	return r
 }

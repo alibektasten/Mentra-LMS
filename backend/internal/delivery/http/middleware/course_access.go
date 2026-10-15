@@ -35,6 +35,36 @@ func RequireAssignedCourse(
 	}
 }
 
+// RequireOptionalProgressCourseAccess keeps the legacy unfiltered progress
+// collection, but authorizes a requested course before any scoped records are
+// read. A course from another tenant is indistinguishable from a missing one.
+func RequireOptionalProgressCourseAccess(courseTeachers repositories.CourseTeacherRepository, groups repositories.GroupRepository, courses repositories.CourseRepository) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		raw, present := c.GetQuery("course_id")
+		if !present {
+			c.Next()
+			return
+		}
+		courseID, ok := requiredUUID(c, raw, "course id")
+		if !ok {
+			return
+		}
+		orgID, ok := requestOrgID(c)
+		if !ok {
+			return
+		}
+		if _, err := courses.FindByID(c.Request.Context(), courseID, orgID); err != nil {
+			c.Error(err)
+			c.Abort()
+			return
+		}
+		if !AuthorizeCourseAccess(c, courseTeachers, groups, courses, courseID) {
+			return
+		}
+		c.Next()
+	}
+}
+
 type courseIDResolver func(ctx context.Context, resourceID, orgID uuid.UUID) (uuid.UUID, error)
 
 // RequireAssignedResource resolves a course from a nested resource and then

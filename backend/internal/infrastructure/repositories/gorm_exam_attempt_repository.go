@@ -3,12 +3,16 @@ package repositories
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/ailms/backend/internal/domain/entities"
+	domainrepos "github.com/ailms/backend/internal/domain/repositories"
 	"github.com/ailms/backend/internal/infrastructure/database"
 	apperrors "github.com/ailms/backend/pkg/errors"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type GORMExamAttemptRepository struct {
@@ -25,6 +29,86 @@ func (r *GORMExamAttemptRepository) Create(ctx context.Context, attempt *entitie
 		return apperrors.InternalError(err.Error())
 	}
 	return r.db.WithContext(ctx).Create(model).Error
+}
+
+// StartOrResume is the database boundary for attempt admission. PostgreSQL's
+// transaction-scoped advisory lock serialises starts for one (exam, student)
+// pair, while the partial unique index added by migrations is the durable
+// backstop against more than one in-progress attempt.
+func (r *GORMExamAttemptRepository) StartOrResume(ctx context.Context, candidate *entities.ExamAttempt, allowedAttempts int, allowNewAttempt bool, now time.Time, expectedExamUpdatedAt *time.Time) (*entities.ExamAttempt, error) {
+	var result *entities.ExamAttempt
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := lockExamConfiguration(tx, candidate.ExamID); err != nil {
+			return apperrors.InternalError(err.Error())
+		}
+		if tx.Dialector.Name() == "postgres" {
+			lockKey := fmt.Sprintf("%s:%s", candidate.ExamID, candidate.StudentID)
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
+				return apperrors.InternalError(err.Error())
+			}
+		}
+		if expectedExamUpdatedAt != nil {
+			var currentExam database.ExamModel
+			err := tx.Select("updated_at").First(&currentExam, "id = ? AND org_id = ?", candidate.ExamID.String(), candidate.OrgID.String()).Error
+			if err == gorm.ErrRecordNotFound {
+				return apperrors.NotFoundError("exam", candidate.ExamID.String())
+			}
+			if err != nil {
+				return apperrors.InternalError(err.Error())
+			}
+			if !currentExam.UpdatedAt.Equal(*expectedExamUpdatedAt) {
+				return domainrepos.ErrExamConfigurationChanged
+			}
+		}
+
+		// The same one-minute server grace period is used by Start, draft save,
+		// and submit. An attempt is only retired after that shared deadline.
+		if err := tx.Model(&database.ExamAttemptModel{}).
+			Where("exam_id = ? AND student_id = ? AND status = ? AND expires_at < ?", candidate.ExamID.String(), candidate.StudentID.String(), "in_progress", now.Add(-time.Minute)).
+			Updates(map[string]interface{}{"status": "expired", "updated_at": now}).Error; err != nil {
+			return apperrors.InternalError(err.Error())
+		}
+
+		var active database.ExamAttemptModel
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("exam_id = ? AND student_id = ? AND status = ?", candidate.ExamID.String(), candidate.StudentID.String(), "in_progress").
+			First(&active).Error
+		if err == nil {
+			var convertErr error
+			result, convertErr = toExamAttemptEntity(&active)
+			return convertErr
+		}
+		if err != gorm.ErrRecordNotFound {
+			return apperrors.InternalError(err.Error())
+		}
+		if !allowNewAttempt {
+			return apperrors.ValidationError("exam is no longer available for new attempts")
+		}
+
+		var count int64
+		if err := tx.Model(&database.ExamAttemptModel{}).
+			Where("exam_id = ? AND student_id = ?", candidate.ExamID.String(), candidate.StudentID.String()).
+			Count(&count).Error; err != nil {
+			return apperrors.InternalError(err.Error())
+		}
+		if int(count) >= allowedAttempts {
+			return apperrors.ValidationError("maximum attempts reached")
+		}
+
+		model, err := toExamAttemptModel(candidate)
+		if err != nil {
+			return apperrors.InternalError(err.Error())
+		}
+		if err := tx.Create(model).Error; err != nil {
+			return apperrors.InternalError(err.Error())
+		}
+		result = candidate
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (r *GORMExamAttemptRepository) FindByID(ctx context.Context, id uuid.UUID) (*entities.ExamAttempt, error) {
@@ -90,6 +174,67 @@ func (r *GORMExamAttemptRepository) FindActiveAttempt(ctx context.Context, examI
 		return nil, apperrors.InternalError(err.Error())
 	}
 	return toExamAttemptEntity(&model)
+}
+
+func (r *GORMExamAttemptRepository) HasAttempts(ctx context.Context, examID uuid.UUID) (bool, error) {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&database.ExamAttemptModel{}).Where("exam_id = ?", examID.String()).Count(&count).Error; err != nil {
+		return false, apperrors.InternalError(err.Error())
+	}
+	return count > 0, nil
+}
+
+// SaveDraftIfInProgress only changes answer data. In particular, a stale
+// autosave cannot resurrect or overwrite a submitted attempt.
+func (r *GORMExamAttemptRepository) SaveDraftIfInProgress(ctx context.Context, attemptID, studentID uuid.UUID, answers []entities.ExamMCQAnswer, updatedAt time.Time) (bool, error) {
+	encoded, err := json.Marshal(answers)
+	if err != nil {
+		return false, apperrors.InternalError(err.Error())
+	}
+	result := r.db.WithContext(ctx).Model(&database.ExamAttemptModel{}).
+		Where("id = ? AND student_id = ? AND status = ? AND expires_at >= ?", attemptID.String(), studentID.String(), "in_progress", updatedAt.Add(-time.Minute)).
+		Updates(map[string]interface{}{"mcq_answers": string(encoded), "updated_at": updatedAt})
+	if result.Error != nil {
+		return false, apperrors.InternalError(result.Error.Error())
+	}
+	return result.RowsAffected == 1, nil
+}
+
+// SubmitIfInProgress is a compare-and-set transition. Exactly one concurrent
+// submit can change the row; later callers re-read the submitted record and
+// receive the same result idempotently.
+func (r *GORMExamAttemptRepository) SubmitIfInProgress(ctx context.Context, attempt *entities.ExamAttempt) (bool, error) {
+	model, err := toExamAttemptModel(attempt)
+	if err != nil {
+		return false, apperrors.InternalError(err.Error())
+	}
+	result := r.db.WithContext(ctx).Model(&database.ExamAttemptModel{}).
+		Where("id = ? AND student_id = ? AND status = ? AND expires_at >= ?", attempt.ID.String(), attempt.StudentID.String(), "in_progress", attempt.UpdatedAt.Add(-time.Minute)).
+		Updates(map[string]interface{}{
+			"status":        model.Status,
+			"submitted_at":  model.SubmittedAt,
+			"mcq_answers":   model.MCQAnswers,
+			"mcq_score":     model.MCQScore,
+			"mcq_max_score": model.MCQMaxScore,
+			"file_path":     model.FilePath,
+			"file_points":   model.FilePoints,
+			"total_score":   model.TotalScore,
+			"updated_at":    model.UpdatedAt,
+		})
+	if result.Error != nil {
+		return false, apperrors.InternalError(result.Error.Error())
+	}
+	return result.RowsAffected == 1, nil
+}
+
+func (r *GORMExamAttemptRepository) ExpireIfInProgress(ctx context.Context, attemptID, studentID uuid.UUID, updatedAt time.Time) (bool, error) {
+	result := r.db.WithContext(ctx).Model(&database.ExamAttemptModel{}).
+		Where("id = ? AND student_id = ? AND status = ? AND expires_at < ?", attemptID.String(), studentID.String(), "in_progress", updatedAt.Add(-time.Minute)).
+		Updates(map[string]interface{}{"status": "expired", "updated_at": updatedAt})
+	if result.Error != nil {
+		return false, apperrors.InternalError(result.Error.Error())
+	}
+	return result.RowsAffected == 1, nil
 }
 
 func (r *GORMExamAttemptRepository) Update(ctx context.Context, attempt *entities.ExamAttempt) error {

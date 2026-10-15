@@ -3,6 +3,7 @@ import { apiClient } from './client';
 export interface UploadResult {
   path: string;
   name: string;
+  upload_token: string;
 }
 
 export async function uploadFile(file: File): Promise<UploadResult> {

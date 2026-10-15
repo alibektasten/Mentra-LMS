@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Users, ChevronDown, ChevronRight, Calendar } from 'lucide-react'
+import { Plus, Users, ChevronDown, ChevronRight, Calendar, ClipboardCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { GroupDTO } from '@/types/group'
 import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup } from '@/lib/queries/groups.queries'
@@ -11,6 +11,7 @@ import { GroupCard } from './GroupCard'
 import { GroupForm } from './GroupForm'
 import { GroupMembers } from './GroupMembers'
 import { GroupScheduleList } from './GroupScheduleList'
+import { AttendanceRegister } from './AttendanceRegister'
 import { useI18n } from '@/lib/i18n'
 
 interface GroupListProps {
@@ -27,7 +28,7 @@ export function GroupList({ courseId }: GroupListProps) {
   const [formOpen, setFormOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<GroupDTO | undefined>()
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'members' | 'schedule'>('members')
+  const [activeTab, setActiveTab] = useState<'members' | 'schedule' | 'attendance'>('members')
 
   const groups = Array.isArray(groupsData) ? groupsData : []
   const selectedGroup = groups.find((g) => g.id === selectedGroupId)
@@ -113,7 +114,7 @@ export function GroupList({ courseId }: GroupListProps) {
           </div>
 
           <div className="flex border-b border-[#e4e2de]">
-            {(['members', 'schedule'] as const).map((tab) => (
+            {(['members', 'schedule', 'attendance'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -123,8 +124,8 @@ export function GroupList({ courseId }: GroupListProps) {
                     : 'border-transparent text-[#9b9b9b] hover:text-[#1a1a1a]'
                 }`}
               >
-                {tab === 'members' ? <Users className="h-3.5 w-3.5" /> : <Calendar className="h-3.5 w-3.5" />}
-                {tab === 'members' ? t('members') : t('schedule')}
+                {tab === 'members' ? <Users className="h-3.5 w-3.5" /> : tab === 'schedule' ? <Calendar className="h-3.5 w-3.5" /> : <ClipboardCheck className="h-3.5 w-3.5" />}
+                {tab === 'members' ? t('members') : tab === 'schedule' ? t('schedule') : 'Attendance'}
               </button>
             ))}
           </div>
@@ -132,9 +133,9 @@ export function GroupList({ courseId }: GroupListProps) {
           <div className="p-5">
             {activeTab === 'members' ? (
               <GroupMembers groupId={selectedGroup.id} courseId={courseId} />
-            ) : (
+            ) : activeTab === 'schedule' ? (
               <GroupScheduleList groupId={selectedGroup.id} courseId={courseId} />
-            )}
+            ) : <AttendanceRegister groupId={selectedGroup.id} courseId={courseId} />}
           </div>
         </div>
       )}

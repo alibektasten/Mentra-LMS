@@ -24,7 +24,7 @@ export function LessonViewer({ lesson, onQuizComplete }: LessonViewerProps) {
       return <QuizViewer questions={questions} onComplete={onQuizComplete} />
     }
     case 'pdf':
-      return <PDFViewer fileUrl={lesson.file_url ?? ''} title={lesson.title} />
+      return <PDFViewer lessonId={lesson.id} fileUrl={lesson.file_url ?? ''} title={lesson.title} />
     case 'link':
       return <LinkViewer linkUrl={lesson.link_url ?? ''} title={lesson.title} content={lesson.content} />
     case 'text':

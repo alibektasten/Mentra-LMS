@@ -49,3 +49,8 @@ func (m *MockAIService) GenerateFlashcards(ctx context.Context, lessonContent st
 	}
 	return args.Get(0).([]entities.Flashcard), args.Error(1)
 }
+
+func (m *MockAIService) GenerateTeachingPlan(ctx context.Context, topic, audience, language string, durationMinutes int) (string, error) {
+	args := m.Called(ctx, topic, audience, language, durationMinutes)
+	return args.String(0), args.Error(1)
+}

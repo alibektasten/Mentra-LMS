@@ -18,9 +18,7 @@
 
   @uploads path /uploads/*
   handle @uploads {
-    root * /srv/uploads
-    header Cache-Control "public, max-age=2592000, immutable"
-    file_server
+    respond "Not Found" 404
   }
 
   reverse_proxy frontend:3000

@@ -14,6 +14,7 @@ export const groupKeys = {
   // courseId optional: omit it for standalone (org-level) member/schedule queries
   members: (groupId: string, courseId?: string) => ['groups', groupId, 'members', courseId ?? 'standalone'] as const,
   schedules: (groupId: string, courseId?: string) => ['groups', groupId, 'schedules', courseId ?? 'standalone'] as const,
+  attendance: (courseId: string, groupId: string, date: string) => [...groupKeys.all, 'attendance', courseId, groupId, date] as const,
   myGroup: (courseId: string) => [...groupKeys.all, 'my-group', courseId] as const,
 }
 
@@ -176,5 +177,21 @@ export function useMyGroup(courseId: string) {
     queryFn: () => groupsApi.getMyGroup(courseId),
     enabled: !!courseId,
     retry: false,
+  })
+}
+
+export function useAttendance(courseId: string, groupId: string, date: string) {
+  return useQuery({
+    queryKey: groupKeys.attendance(courseId, groupId, date),
+    queryFn: () => groupsApi.getAttendance(courseId, groupId, date),
+    enabled: Boolean(courseId && groupId && date),
+  })
+}
+
+export function useSaveAttendance(courseId: string, groupId: string, date: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: import('@/types/group').SaveAttendanceInput) => groupsApi.saveAttendance(courseId, groupId, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: groupKeys.attendance(courseId, groupId, date) }),
   })
 }

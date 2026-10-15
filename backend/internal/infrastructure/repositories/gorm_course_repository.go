@@ -24,6 +24,35 @@ func (r *GORMCourseRepository) Create(ctx context.Context, course *entities.Cour
 	return r.db.WithContext(ctx).Create(model).Error
 }
 
+// CreateWithAcademicSetup prevents a partially provisioned course if the
+// teacher assignment or one of the required assessments cannot be stored.
+func (r *GORMCourseRepository) CreateWithAcademicSetup(ctx context.Context, course *entities.Course, teacher *entities.CourseTeacher, exams []*entities.Exam) error {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(toCourseModel(course)).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&database.CourseTeacherModel{
+			ID:         teacher.ID.String(),
+			CourseID:   teacher.CourseID.String(),
+			TeacherID:  teacher.TeacherID.String(),
+			OrgID:      teacher.OrgID.String(),
+			AssignedAt: teacher.AssignedAt,
+		}).Error; err != nil {
+			return err
+		}
+		for _, exam := range exams {
+			if err := tx.Create(toExamModel(exam)).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return apperrors.InternalError(err.Error())
+	}
+	return nil
+}
+
 func (r *GORMCourseRepository) FindByID(ctx context.Context, id, orgID uuid.UUID) (*entities.Course, error) {
 	var model database.CourseModel
 	err := r.db.WithContext(ctx).First(&model, "id = ? AND org_id = ?", id.String(), orgID.String()).Error

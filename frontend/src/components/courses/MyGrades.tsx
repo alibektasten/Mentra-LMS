@@ -30,7 +30,8 @@ export function MyGrades({ courseId }: MyGradesProps) {
     return <p className="text-sm text-ink-muted py-4">{t('noGradedItems')}</p>
   }
 
-  const letter = data.is_final_grade_ready ? letterGrade(data.percentage) : '—'
+  const finalPublished = data.is_published && data.final_grade !== undefined
+  const letter = finalPublished ? letterGrade(data.final_grade ?? 0) : '—'
   const gradedCount = data.items.filter((item) => item.status === 'graded').length
   const submittedCount = data.items.filter((item) => item.status === 'submitted').length
 
@@ -41,8 +42,8 @@ export function MyGrades({ courseId }: MyGradesProps) {
         <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-ink-muted">Final grade (weighted)</p>
-          <p className="text-2xl font-bold text-ink">{data.is_final_grade_ready ? `${data.percentage.toFixed(1)}%` : 'Pending'}</p>
-          <p className="text-xs text-ink-subtle">{data.is_final_grade_ready ? 'Assignments, midterm, endterm, and final exam' : 'The final grade appears after every required component is graded.'}</p>
+          <p className="text-2xl font-bold text-ink">{finalPublished ? `${data.final_grade?.toFixed(1)}%` : data.is_final_grade_ready ? 'Awaiting publication' : 'Pending'}</p>
+          <p className="text-xs text-ink-subtle">{finalPublished ? 'Assignments, midterm, endterm, and final exam' : data.is_final_grade_ready ? 'Your instructor has not published the final result yet.' : 'The final grade appears after every required component is graded.'}</p>
         </div>
         <div className="text-4xl font-bold text-accent">{letter}</div>
         </div>
@@ -59,7 +60,7 @@ export function MyGrades({ courseId }: MyGradesProps) {
       </div>
 
       <div className="rounded-xl border border-[#e4e2de] bg-white p-4">
-        <div className="flex items-center justify-between"><div><p className="font-semibold text-[#1a1a1a]">Assessment formula</p><p className="mt-0.5 text-xs text-[#85847e]">The weighted grade is calculated automatically as results are published.</p></div><span className={data.is_final_grade_ready ? 'rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700' : 'rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700'}>{data.is_final_grade_ready ? 'Complete' : 'In progress'}</span></div>
+        <div className="flex items-center justify-between"><div><p className="font-semibold text-[#1a1a1a]">Assessment formula</p><p className="mt-0.5 text-xs text-[#85847e]">The weighted grade is calculated automatically as results are published.</p></div><span className={finalPublished ? 'rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700' : 'rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700'}>{finalPublished ? 'Published' : data.is_final_grade_ready ? 'Awaiting publication' : 'In progress'}</span></div>
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <FormulaPart label="Assignments" weight="25%" value={data.assignments_percent} />
           <FormulaPart label="Midterm" weight="12.5%" value={data.midterm_percent} />

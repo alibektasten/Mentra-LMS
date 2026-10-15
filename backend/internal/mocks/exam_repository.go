@@ -38,6 +38,11 @@ func (m *MockExamRepository) Update(ctx context.Context, exam *entities.Exam) er
 	return args.Error(0)
 }
 
+func (m *MockExamRepository) UpdateWithAttemptGuard(ctx context.Context, exam *entities.Exam, rejectIfAttempts bool) (bool, error) {
+	args := m.Called(ctx, exam, rejectIfAttempts)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *MockExamRepository) Delete(ctx context.Context, id, orgID uuid.UUID) error {
 	args := m.Called(ctx, id, orgID)
 	return args.Error(0)
