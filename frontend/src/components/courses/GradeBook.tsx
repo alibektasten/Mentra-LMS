@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SubmissionGrader } from './SubmissionGrader'
-import { ClipboardList } from 'lucide-react'
+import { ClipboardList, Download } from 'lucide-react'
 
 interface GradeBookProps {
   courseId: string
@@ -63,6 +63,31 @@ function AssignmentRow({ assignment }: { assignment: AssignmentDTO }) {
   const graded = submissions?.filter((s) => s.score !== null).length ?? 0
   const pending = total - graded
 
+  const downloadCSV = () => {
+    if (!submissions?.length) return
+    const escape = (value: string | number | null) => `"${String(value ?? '').replaceAll('"', '""')}"`
+    const rows = [
+      ['Student', 'Student ID', 'Assignment', 'Score', 'Max points', 'Status', 'Submitted at', 'Graded at'],
+      ...submissions.map((submission) => [
+        submission.student_name || 'Student',
+        submission.student_id,
+        assignment.title,
+        submission.score,
+        assignment.max_points,
+        submission.score === null ? 'Pending review' : 'Graded',
+        new Date(submission.submitted_at).toLocaleString(),
+        submission.graded_at ? new Date(submission.graded_at).toLocaleString() : '',
+      ]),
+    ]
+    const content = `\uFEFF${rows.map((row) => row.map(escape).join(',')).join('\n')}`
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${assignment.title.replaceAll(/[^a-z0-9]+/gi, '-').replace(/(^-|-$)/g, '') || 'assignment'}-grades.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <>
       <div className="flex items-center justify-between px-4 py-3">
@@ -90,15 +115,18 @@ function AssignmentRow({ assignment }: { assignment: AssignmentDTO }) {
             )}
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs gap-1.5 border-[#e4e2de] shrink-0"
-          onClick={() => setOpen(true)}
-        >
-          <ClipboardList className="h-3.5 w-3.5" />
-          {total > 0 ? 'Grade' : 'Submissions'}
-        </Button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {total > 0 && <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-[#6b6b6b]" onClick={downloadCSV} aria-label={`Export ${assignment.title} grades`} title="Export CSV"><Download className="h-3.5 w-3.5" /></Button>}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1.5 border-[#e4e2de]"
+            onClick={() => setOpen(true)}
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            {total > 0 ? 'Grade' : 'Submissions'}
+          </Button>
+        </div>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
